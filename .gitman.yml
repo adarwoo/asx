@@ -1,0 +1,9 @@
+location: import
+sources:
+  - name: libstdc++
+    repo: https://github.com/modm-io/avr-libstdcpp.git
+    rev: master
+  - name: boost
+    repo: https://github.com/boost-ext/sml.git
+    rev: master
+    tag: v1.1.11
