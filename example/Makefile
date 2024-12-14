@@ -11,15 +11,11 @@ BIN:=blink
 INCLUDE_DIRS:=.
 
 # Let ASX know what the project requires. See asx.mak for the list.
-ASX_USE:=reactor timer mem
+ASX_USE:=timer
 
 # Project own files. All core ASX files are added automatically
 SRCS:=blink.cpp
 
 # Inlude the actual build rules
-# !!WARNING!!: For a normal project, this should be:
-# include $(TOP)/asx/make/rules.mak
-
-# !!!Do not copy this part!!!
-override ASX_DIR:=$(TOP)
+ASX_DIR:=$(TOP)
 include $(TOP)/make/rules.mak
