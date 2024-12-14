@@ -1,0 +1,28 @@
+location: gitman_sources
+sources:
+  - repo: https://github.com/githubtraining/hellogitworld
+    name: sample_dependency
+    rev: master
+    type: git
+    params:
+    sparse_paths:
+      -
+    links:
+      -
+    scripts:
+      -
+sources_locked:
+  - repo: https://github.com/githubtraining/hellogitworld
+    name: sample_dependency
+    rev: ebbbf773431ba07510251bb03f9525c7bab2b13a
+    type: git
+    params:
+    sparse_paths:
+      -
+    links:
+      -
+    scripts:
+      -
+default_group: ''
+groups:
+  -
