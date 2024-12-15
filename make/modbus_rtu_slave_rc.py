@@ -198,7 +198,7 @@ namespace @NAMESPACE@ {
 } // namespace modbus"""
 
 # Regex to check the device address (and extract it)
-DEVICE_ADDR_RE = re.compile(r'device@(?:0x)?([0-9a-fA-F]+)')
+DEVICE_ADDR_RE = re.compile(r'device@((?:0x)?([0-9a-fA-F]+))')
 
 # Regex pattern for a valid C function name
 VALID_C_FUNCTION_NAME = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')

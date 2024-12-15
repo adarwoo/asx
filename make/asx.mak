@@ -38,6 +38,10 @@ SRCS+=\
    $(if $(filter modbus_rtu,$(ASX_USE)), $(ASX_PATH)src/modbus_rtu.cpp, ) \
    $(if $(filter hw_timer,$(ASX_USE)), $(ASX_PATH)src/hw_timer.cpp, ) \
 
+ifneq ($(filter modbus_rtu,$(ASX_USE)),)
+ASX_USE+=hw_timer reactor timer uart logger
+endif
+
 ifneq ($(filter logger,$(ASX_USE)),)
 	ifdef SIM
 		SRCS+=\
@@ -51,7 +55,10 @@ ifneq ($(filter logger,$(ASX_USE)),)
 	INCLUDE_DIRS+=$(ASX_DIR)/logger/include
 endif
 
-INCLUDE_DIRS+=$(ASX_DIR)/include \
+INCLUDE_DIRS+=\
+	$(ASX_DIR)/include \
+	$(ASX_DIR)/import/boost/include \
+	$(ASX_DIR)/import/libstdc++/include \
 
 ifndef SIM
 INCLUDE_DIRS+=$(TOP)/$(STDCXX_DIR)/include

@@ -131,7 +131,7 @@ $(BUILD_DIR)/%.rcd : %.json
 %.hpp : %.conf.py
 	@echo Generating $@ interface header code from $<
 	$(MUTE)[ -d $(@D) ] || mkdir -p $(@D)
-	$(MUTE)PYTHONPATH=$(TOP)/make python3 $< -o$@
+	$(MUTE)PYTHONPATH=$(TOP)/asx/make python3 $< -o$@
 
 # Add the CRC of the code to enable integrity check of the code
 # $(BUILD_DIR)/$(BIN)_crc$(BIN_EXT) : $(BUILD_DIR)/$(BIN)$(BIN_EXT)
