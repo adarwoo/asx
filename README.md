@@ -26,36 +26,27 @@ It is designed to compile with a C++17 or C++20 compiler.
 Example code:
 
 ```C++
-  #include <asx/sysclock.hpp>
-  #include <asx/reactor.hpp>
-  #include <asx/ioport.hpp>
-  #include <chrono>
+#include <chrono> // For the ""s
+#include <asx/reactor.hpp>
 
-  using namespace asx;
+#include <conf_board.h>
 
-  namespace {
-     using namespace asx::sysclock;
-     using sysclock = sysclock<20MHz>;
-  }
- 
-  namespace {
-     using namespace asx::ioport;
-     auto led1 = ioport<A, 2, output | pullup>{0};
-  }
+using namespace asx;
+using namespace asx::ioport;
+using namespace std::chrono;
 
-  auto flash_led() -> void {
-     led1.toggle();
-  }
-  
-  auto main() -> int {
-     using namespace std::chrono;
-     sysclock::init();
-     reactor::init();
+// Called by the reactor every second
+auto flash_led() -> void {
+   Pin(MY_LED).toggle();
+}
 
-     reactor.bind(flash_led).repeat(1s);
+// Initialise all and go
+auto main() -> int {
+   Pin(MY_LED).init(dir_t::out, value_t::high);
 
-     reactor::run();
-  }
+   reactor::bind(flash_led).repeat(1s);
+   reactor::run();
+}
 ```
   
    
