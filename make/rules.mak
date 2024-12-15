@@ -3,9 +3,14 @@
 # Are we running in a Docker env?
 
 # Check if running inside Docker
-INSIDE_DOCKER:=$(shell test -f /.dockerenv && echo yes || echo no)
+SWITCH_TO_DOCKER:=$(shell test -f /.dockerenv && echo no || echo yes)
 
-ifeq ($(INSIDE_DOCKER),no)
+# For AVR Studio, build
+ifndef ToolchainDir
+SWITCH_TO_DOCKER:=no
+endif
+
+ifeq ($(SWITCH_TO_DOCKER),no)
 # Find the directory of this file (b.mak)
 CURRENT_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 ASX_DIR := $(dir $(abspath $(CURRENT_MAKEFILE)/..))
