@@ -1,4 +1,5 @@
 #pragma once
+#pragma GCC diagnostic ignored "-Warray-bounds"
 
 #include <stdint.h>
 #include <string_view>
@@ -46,12 +47,12 @@ namespace asx {
 
          static_assert(N < 2, "Invalid USART number");
 
-         static constexpr USART_t & get() {
+         static USART_t & get() {
             if constexpr (N == 0) {
-               return *(&USART0);
+               return USART0;
             }
 
-            return *(&USART1);
+            return USART1;
          }
 
          static constexpr uint16_t get_baud() {

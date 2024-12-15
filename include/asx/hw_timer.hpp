@@ -1,4 +1,5 @@
 #pragma once
+#pragma GCC diagnostic ignored "-Warray-bounds"
 
 #include <avr/io.h>
 
@@ -81,7 +82,7 @@ namespace asx {
          TimerA() = delete;
 
          static constexpr TCA_SINGLE_t &TCA() {
-            return *&(TCA0.SINGLE);
+            return TCA0.SINGLE;
          }
 
          // Replace the lambda function with this constexpr function

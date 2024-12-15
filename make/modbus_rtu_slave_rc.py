@@ -157,6 +157,10 @@ namespace @NAMESPACE@ {
             }
         }
 
+        static inline void set_size(uint8_t size) {
+            cnt = size;
+        }
+
         /** Called when a T3.5 has been detected, in a good sequence */
         static void ready_reply() noexcept {
             frame_size = cnt; // Store the frame size

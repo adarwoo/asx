@@ -1,19 +1,18 @@
 .PHONY: clean all
 
-# Are we running in a Docker env?
-
 # Check if running inside Docker
 SWITCH_TO_DOCKER:=$(shell test -f /.dockerenv && echo no || echo yes)
 
 # For AVR Studio, build
-ifndef ToolchainDir
+ifdef ToolchainDir
 SWITCH_TO_DOCKER:=no
 endif
 
-ifeq ($(SWITCH_TO_DOCKER),no)
+ifeq ($(SWITCH_TO_DOCKER),yes)
 # Find the directory of this file (b.mak)
 CURRENT_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 ASX_DIR := $(dir $(abspath $(CURRENT_MAKEFILE)/..))
+
 
 # Not in Docker, respawn inside Docker
 DOCKER_RUN_CMD := $(ASX_DIR)buildenv make
