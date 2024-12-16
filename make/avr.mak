@@ -19,7 +19,7 @@ BIN_EXT :=.elf
 CPPFLAGS += -DFORCE_NODEBUG
 ARCHFLAGS :=-mmcu=$(ARCH) -B $(SPEC_PATH) -isystem $(PACK_PATH)/include
 CFLAGS += -funsigned-char -funsigned-bitfields -ffunction-sections -fdata-sections -fshort-enums $(ARCHFLAGS)
-CFLAGS += -O$(if $(DEBUG),g,s)
+CFLAGS += -O$(if $(NDEBUG),s,g)
 ASFLAGS += $(CPPFLAGS) $(ARCHFLAGS)
 CXXFLAGS += -fno-threadsafe-statics -Wno-subobject-linkage
 LDFLAGS += $(ARCHFLAGS) -Wl,-Map="$(BIN).map" -Wl,--start-group -Wl,-lm  -Wl,--end-group -Wl,--gc-sections -mmcu=$(ARCH) -Wl,--demangle -Wl,-flto

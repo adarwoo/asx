@@ -16,9 +16,11 @@ ASX_DIR := $(dir $(abspath $(CURRENT_MAKEFILE)/..))
 
 # Not in Docker, respawn inside Docker
 DOCKER_RUN_CMD := $(ASX_DIR)buildenv make
+CMD_VARS=$(strip \
+	$(foreach var, $(.VARIABLES), $(if $(filter command line, $(origin $(var))), $(var)=$($(var)))))
 
 all $(filter-out all, $(MAKECMDGOALS)):
-	@$(DOCKER_RUN_CMD) $@
+	@$(DOCKER_RUN_CMD) $@ $(CMD_VARS)
 else
 
 # By default, build for the AVR target. Export sim to build a simulator
