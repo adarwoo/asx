@@ -9,6 +9,8 @@
 #include <cstddef>
 #include <utility>
 #include <algorithm>
+#include <string_view>
+#include <alert.h>
 
 namespace asx
 {
@@ -25,4 +27,28 @@ namespace asx
       constexpr std::string_view view() const { return { value, N - 1 }; }
    };
 
-}
+   template<typename T, std::size_t Size>
+   class FixedPtrQueue {
+         std::array<T*, Size> data;
+         uint8_t front;
+         uint8_t back;
+         uint8_t count;
+   public:
+         FixedPtrQueue() : front(0), back(0), count(0) {}
+
+         void push(T* item) {
+            alert_and_stop_if(count == Size);
+            data[back] = item;
+            back = (back + 1) % Size;
+            ++count;
+         }
+
+         T* pop() {
+            alert_and_stop_if(count == 0);
+            auto item = data[front];
+            front = (front + 1) % Size;
+            --count;
+            return item;
+         }
+   };        
+}   

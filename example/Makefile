@@ -11,7 +11,7 @@ BIN:=blink
 INCLUDE_DIRS:=.
 
 # Let ASX know what the project requires. See asx.mak for the list.
-ASX_USE:=timer
+ASX_USE:=timer eeprom
 
 # Project own files. All core ASX files are added automatically
 SRCS:=blink.cpp

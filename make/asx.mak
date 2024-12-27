@@ -37,6 +37,7 @@ SRCS+=\
    $(if $(filter uart,$(ASX_USE)), $(ASX_PATH)src/uart.cpp, ) \
    $(if $(filter modbus_rtu,$(ASX_USE)), $(ASX_PATH)src/modbus_rtu.cpp, ) \
    $(if $(filter hw_timer,$(ASX_USE)), $(ASX_PATH)src/hw_timer.cpp, ) \
+   $(if $(filter eeprom,$(ASX_USE)), $(ASX_PATH)src/eeprom.cpp, ) \
 
 ifneq ($(filter modbus_rtu,$(ASX_USE)),)
 ASX_USE+=hw_timer reactor timer uart logger
