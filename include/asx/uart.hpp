@@ -40,7 +40,29 @@ namespace asx {
       constexpr auto disable_rx = 1<<4;
       constexpr auto disable_tx = 1<<5;
 
-      template<int N, long BAUD, width W, parity P, stop S, int OPTIONS=0>
+      // Configuration management
+      template <typename Config>
+      concept UartConfig = requires(Config p, int option) {
+         { p.has(option)    } -> std::same_as<bool>;
+         { p.get_width()    } -> std::same_as<width>;
+         { p.get_parity()   } -> std::same_as<parity>;
+         { p.get_stop()     } -> std::same_as<stop>;
+         { p.get_baud()     } -> std::same_as<uint32_t>;
+         { p.init()         };
+      };
+
+      // Compile-time configuration Config
+      template<size_t BAUD, width W, parity P, stop S, int OPTIONS = 0>
+      struct CompileTimeConfig {
+         static consteval void init() {}
+         static consteval width get_width() { return W; }
+         static consteval parity get_parity() { return P; }
+         static consteval stop get_stop() { return S; }
+         static consteval uint32_t get_baud() { return BAUD; }
+         static consteval bool has(int options) { return OPTIONS & options; }
+      };
+
+      template<int N, UartConfig Config>
       class Uart {
          ///< Contains a view to transmit
          inline static std::string_view to_send;
@@ -55,66 +77,64 @@ namespace asx {
             return USART1;
          }
 
-         static constexpr uint16_t get_baud() {
-            // Compute on full precision
-            unsigned long baud = ((64UL * F_CPU) / ((unsigned long)BAUD)) / 16UL;
-            return static_cast<uint16_t>(baud);
+         static constexpr uint16_t get_baud_reg() {
+            return static_cast<uint16_t>(((64UL * F_CPU) / (Config::get_baud())) / 16UL);
          }
 
-         static consteval uint8_t get_ctrl_a() {
+         static constexpr uint8_t get_ctrl_a() {
             uint8_t retval = 0;
 
-            if (OPTIONS & rs485) {
+            if (Config::has(rs485)) {
                retval |= USART_RS485_bm;
             }
 
-            if (OPTIONS & onewire) {
+            if (Config::has(onewire)) {
                retval |= USART_LBME_bm;
             }
 
             return retval;
          }
 
-         static consteval uint8_t get_ctrl_b() {
+         static constexpr uint8_t get_ctrl_b() {
             uint8_t retval = USART_RXEN_bm | USART_TXEN_bm | USART_RXMODE_NORMAL_gc;
 
-            if (OPTIONS & onewire) {
+            if (Config::has(onewire)) {
                retval |= USART_ODME_bm;
             }
 
-            if (OPTIONS & disable_rx) {
+            if (Config::has(disable_rx)) {
                retval &= (~USART_RXEN_bm);
             }
 
-            if (OPTIONS & disable_rx) {
+            if (Config::has(disable_rx)) {
                retval &= (~USART_TXEN_bm);
             }
 
             return retval;
          }
 
-         static consteval uint8_t get_ctrl_c() {
+         static constexpr uint8_t get_ctrl_c() {
             uint8_t retval = USART_CMODE_ASYNCHRONOUS_gc;
 
-            if (W == width::_5) {
+            if (Config::get_width() == width::_5) {
                retval |= USART_CHSIZE_5BIT_gc;
-            } else if (W == width::_6) {
+            } else if (Config::get_width() == width::_6) {
                retval |= USART_CHSIZE_6BIT_gc;
-            } else if (W == width::_7) {
+            } else if (Config::get_width() == width::_7) {
                retval |= USART_CHSIZE_7BIT_gc;
-            } else if (W == width::_8) {
+            } else if (Config::get_width() == width::_8) {
                retval |= USART_CHSIZE_8BIT_gc;
             }
 
-            if (P == parity::odd) {
+            if (Config::get_parity() == parity::odd) {
                retval |= USART_PMODE_ODD_gc;
-            } else if (P == parity::even) {
+            } else if (Config::get_parity() == parity::even) {
                retval |= USART_PMODE_EVEN_gc;
             }
 
-            if (S == stop::_1) {
+            if (Config::get_stop() == stop::_1) {
                retval |= USART_SBMODE_1BIT_gc;
-            } else if (S == stop::_2) {
+            } else if (Config::get_stop() == stop::_2) {
                retval |= USART_SBMODE_2BIT_gc;
             }
 
@@ -123,11 +143,13 @@ namespace asx {
 
       public:
          static void init() {
-            if (OPTIONS & map_to_alt_position) {
+            Config::init();
+
+            if (Config::has(map_to_alt_position)) {
                if (N == 0) {
                   PORTMUX_USARTROUTEA |= PORTMUX_USART0_ALT1_gc;
 
-                  if (OPTIONS & onewire) {
+                  if (Config::has(onewire)) {
                      PORTA.PIN1CTRL |= PORT_PULLUPEN_bm;
                      VPORTA_DIR |= _BV(4);
                   } else {
@@ -136,7 +158,7 @@ namespace asx {
                } else {
                   PORTMUX_USARTROUTEA |= 4; // Bug in AVR defs
 
-                  if (OPTIONS & onewire) {
+                  if (Config::has(onewire)) {
                      PORTC.PIN2CTRL |= PORT_PULLUPEN_bm;
                      VPORTC_DIR |= _BV(3);
                   } else {
@@ -145,7 +167,7 @@ namespace asx {
                }
             } else {
                if (N == 0) {
-                  if (OPTIONS & onewire) {
+                  if (Config::has(onewire)) {
                      PORTB.PIN2CTRL |= PORT_PULLUPEN_bm;
                      VPORTB_DIR |= _BV(0);
                   } else {
@@ -153,7 +175,7 @@ namespace asx {
                   }
 
                } else {
-                  if (OPTIONS & onewire) {
+                  if (Config::has(onewire)) {
                      PORTA.PIN1CTRL |= PORT_PULLUPEN_bm;
                      VPORTA_DIR |= _BV(4);
                   } else {
@@ -165,7 +187,7 @@ namespace asx {
             get().CTRLA = get_ctrl_a();
             get().CTRLB = get_ctrl_b();
             get().CTRLC = get_ctrl_c();
-            get().BAUD = get_baud();
+            get().BAUD = get_baud_reg();
 
             // Register a reactor for filling the buffer
             if ( N == 0 ) {
@@ -233,20 +255,18 @@ namespace asx {
             }
 		   }
 
-         static constexpr asx::chrono::cpu_tick_t get_byte_duration(const float length_multipler=1.0) {
+         static asx::chrono::cpu_tick_t get_byte_duration(const float length_multipler=1.0) {
             int width = 1 /* start bit */
-               + (int)W /* Width 5 to 9 */
-               + (int)S /* Number of stop bits 1 to 2 */
-               + (P==parity::none ? 0 : 1); /* Extra parity bit */
+               + (int)Config::get_width() /* Width 5 to 9 */
+               + (int)Config::get_stop() /* Number of stop bits 1 to 2 */
+               + (Config::get_parity()==parity::none ? 0 : 1); /* Extra parity bit */
 
             return asx::chrono::cpu_tick_t(
                static_cast<unsigned long>(
-                  (width * F_CPU * length_multipler) / (unsigned long)BAUD
+                  (width * F_CPU * length_multipler) / Config::get_baud()
                )
             );
          }
       };
    } // end of namespace uart
 } // end of namespace asx
-
-

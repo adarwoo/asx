@@ -135,6 +135,7 @@ void reactor_null_notify_from_isr(reactor_handle_t handle)
    }
 }
 
+
 /**
  * Interrupts are disabled for atomic operations
  * This function can be called from within interrupts

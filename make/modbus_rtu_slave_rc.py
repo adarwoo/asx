@@ -165,6 +165,7 @@ namespace @NAMESPACE@ {
         static void ready_reply() noexcept {
             frame_size = cnt; // Store the frame size
             cnt = 2; // Points to the function code
+            @READY_REPLY_CALLBACK@
 
             switch(state) {
             case state_t::IGNORE:
@@ -571,6 +572,8 @@ class CodeGenerator:
         self.max_buf_size = 0
         # Buffer index
         self.buffer_index = 0
+        # Specific callbacks
+        self.on_ready_reply_callback = None
 
         if "callbacks" not in tree:
             raise ParsingException("Callbacks are required")
@@ -591,6 +594,9 @@ class CodeGenerator:
 
         # Set the namespace
         self.namespace = tree.get("namespace", "slave")
+
+        if "on_received" in tree:
+            self.on_ready_reply_callback = tree["on_received"]
 
         self.process_devices(tree)
 
@@ -618,6 +624,7 @@ class CodeGenerator:
             "CALLBACKS" : self.get_callbacks_text(2),
             "INCOMPLETE": self.get_incomplete_text(2),
             "PROTOTYPES" : self.get_prototypes(1),
+            "READY_REPLY_CALLBACK": self.get_ready_reply_callback(1),
         }
 
         # Function to replace each placeholder
@@ -635,6 +642,11 @@ class CodeGenerator:
         tab = INDENT * indent
 
         return ",\n".join(f"{tab}{state.name}" for state in self.states)
+
+    def get_ready_reply_callback(self, indent):
+        if self.on_ready_reply_callback:
+            return f"{self.on_ready_reply_callback}(std::string_view{{(char *)buffer, cnt}});"
+        return ""
 
     def get_cases_text(self, indent):
         state_code = str()
@@ -691,6 +703,9 @@ class CodeGenerator:
                 retval += f"{param(0).ctype}{param_name}{comma}"
 
             retval += ");\n"
+
+        if self.on_ready_reply_callback:
+            retval += f"{tab}void {self.on_ready_reply_callback}(std::string_view);";
 
         return retval
 

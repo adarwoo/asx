@@ -94,6 +94,8 @@ extern "C" {
  */
 extern void ccp_write_io(void *addr, uint8_t value);
 
+extern void ccp_write_spm(void *addr, uint8_t value);
+
 /** @} */
 
 /**

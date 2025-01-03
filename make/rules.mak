@@ -165,5 +165,5 @@ $(BUILDDIRS) :
 #
 clean:
 	@echo Removing build directory: $(BUILD_DIR)
-	$(MUTE)rm -rf $(BUILD_DIR)
+	$(MUTE)rm -rf $(BUILD_DIR) $(CLEAN_FILES)
 endif

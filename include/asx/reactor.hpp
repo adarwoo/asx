@@ -137,6 +137,10 @@ namespace asx {
             );
          }
 
+         inline void clear() {
+            reactor_clear( 1<<handle );
+         }
+
          template <typename T>
          inline timer::Instance delay(
             timer::duration after, T arg)

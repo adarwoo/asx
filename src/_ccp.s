@@ -44,56 +44,28 @@
 
 //! Value to write to CCP for access to protected IO registers.
 #define CCP_IOREG   0xd8
+#define CCP_SPM     0x9d
 
-	/*
-	 * GNU and IAR use different calling conventions. Since this is
-	 * a very small and simple function to begin with, it's easier
-	 * to implement it twice than to deal with the differences
-	 * within a single implementation.
-	 *
-	 * Interrupts are disabled by hardware during the timed
-	 * sequence, so there's no need to save/restore interrupt state.
-	 */
 
-	PUBLIC_FUNCTION(ccp_write_io)
+PUBLIC_FUNCTION(ccp_write_io)
 
-#if defined(__GNUC__)
+movw    r30, r24                // Load addr into Z
+ldi     r18, CCP_IOREG          // Load magic CCP value
+out     CCP, r18                // Start CCP handshake
+st      Z, r22                  // Write value to I/O register
+ret                             // Return to caller
 
-	movw    r30, r24                // Load addr into Z
-	ldi     r18, CCP_IOREG          // Load magic CCP value
-	out     CCP, r18                // Start CCP handshake
-	st      Z, r22                  // Write value to I/O register
-	ret                             // Return to caller
+END_FUNC(ccp_write_io)
 
-#elif defined(__IAR_SYSTEMS_ASM__)
 
-# if !defined(CONFIG_MEMORY_MODEL_TINY) && !defined(CONFIG_MEMORY_MODEL_SMALL) \
-                && !defined(CONFIG_MEMORY_MODEL_LARGE)
-#  define CONFIG_MEMORY_MODEL_SMALL
-# endif
-	ldi     r20, 0
-	out     RAMPZ, r20              // Reset bits 23:16 of Z
-# if defined(CONFIG_MEMORY_MODEL_TINY)
-	mov     r31, r20                // Reset bits 8:15 of Z
-	mov     r30, r16                // Load addr into Z
-# else
-	movw    r30, r16                // Load addr into Z
-# endif
-	ldi     r21, CCP_IOREG          // Load magic CCP value
-	out     CCP, r21                // Start CCP handshake
-# if defined(CONFIG_MEMORY_MODEL_TINY)
-	st      Z, r17                  // Write value to I/O register
-# elif defined(CONFIG_MEMORY_MODEL_SMALL)
-	st      Z, r18                  // Write value to I/O register
-# elif defined(CONFIG_MEMORY_MODEL_LARGE)
-	st      Z, r19                  // Write value to I/O register
-# else
-#  error Unknown memory model in use, no idea how registers should be accessed
-# endif
-        ret
-#else
-# error Unknown assembler
-#endif
+PUBLIC_FUNCTION(ccp_write_spm)
 
-	END_FUNC(ccp_write_io)
-	END_FILE()
+movw    r30, r24                // Load addr into Z
+ldi     r18, CCP_SPM            // Load magic CCP value
+out     CCP, r18                // Start CCP handshake
+st      Z, r22                  // Write value to I/O register
+ret                             // Return to caller
+
+END_FUNC(ccp_write_spm)
+	
+END_FILE()

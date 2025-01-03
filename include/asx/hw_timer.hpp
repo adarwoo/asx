@@ -52,14 +52,22 @@ namespace asx {
        * Specialized instance of the timer A
        */
       template<asx::chrono::cpu_tick_t::rep N>
+      struct TimerDuration {
+         // Recover cpu_tick_t from the raw tick count N
+         static constexpr asx::chrono::cpu_tick_t duration = asx::chrono::cpu_tick_t(N);
+
+         static constexpr auto count() {
+            return duration.count();
+         }
+
+      };
+
+      template<class Duration>
       struct TimerA
       {
          using type_t = TCA_t;  // Specify the timer type as TCA_t
          using value_t = Counting16;
          using self = TimerA;
-
-         // Recover cpu_tick_t from the raw tick count N
-         static constexpr asx::chrono::cpu_tick_t duration = asx::chrono::cpu_tick_t(N);
 
          static inline reactor::mask clear_masks = 0;
 
@@ -88,14 +96,14 @@ namespace asx {
          // Replace the lambda function with this constexpr function
          static constexpr auto set_prescaler_for_maximum_ticks() {
             return (
-                  duration.count() <= prescalers[0] * value_t::maximum) ? std::make_tuple(prescalers[0], clksel[0])
-               : (duration.count() <= prescalers[1] * value_t::maximum) ? std::make_tuple(prescalers[1], clksel[1])
-               : (duration.count() <= prescalers[2] * value_t::maximum) ? std::make_tuple(prescalers[2], clksel[2])
-               : (duration.count() <= prescalers[3] * value_t::maximum) ? std::make_tuple(prescalers[3], clksel[3])
-               : (duration.count() <= prescalers[4] * value_t::maximum) ? std::make_tuple(prescalers[4], clksel[4])
-               : (duration.count() <= prescalers[5] * value_t::maximum) ? std::make_tuple(prescalers[5], clksel[5])
-               : (duration.count() <= prescalers[6] * value_t::maximum) ? std::make_tuple(prescalers[6], clksel[6])
-               : (duration.count() <= prescalers[7] * value_t::maximum) ? std::make_tuple(prescalers[7], clksel[7])
+                  Duration::count() <= prescalers[0] * value_t::maximum) ? std::make_tuple(prescalers[0], clksel[0])
+               : (Duration::count() <= prescalers[1] * value_t::maximum) ? std::make_tuple(prescalers[1], clksel[1])
+               : (Duration::count() <= prescalers[2] * value_t::maximum) ? std::make_tuple(prescalers[2], clksel[2])
+               : (Duration::count() <= prescalers[3] * value_t::maximum) ? std::make_tuple(prescalers[3], clksel[3])
+               : (Duration::count() <= prescalers[4] * value_t::maximum) ? std::make_tuple(prescalers[4], clksel[4])
+               : (Duration::count() <= prescalers[5] * value_t::maximum) ? std::make_tuple(prescalers[5], clksel[5])
+               : (Duration::count() <= prescalers[6] * value_t::maximum) ? std::make_tuple(prescalers[6], clksel[6])
+               : (Duration::count() <= prescalers[7] * value_t::maximum) ? std::make_tuple(prescalers[7], clksel[7])
                : std::make_tuple(prescalers[0], clksel[0]); // Fallback (shouldn't happen with valid MaxTicks)
          }
 
@@ -186,7 +194,7 @@ namespace asx {
             timera_config_flag = flags;
 
             TCA().CNT = 0;
-            TCA().PER = duration.count() / std::get<0>(prescaler);
+            TCA().PER = Duration::count() / std::get<0>(prescaler);
             TCA().CTRLA = std::get<1>(prescaler);
             TCA().CTRLB = 0; // Normal mode
          }

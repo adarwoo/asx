@@ -51,15 +51,10 @@ namespace asx {
       struct char_received { uint8_t c{}; };
       struct frame_sent {};
 
-      template<class Datagram, class Uart>
-      class Slave {
-         using Self = Slave;
-
-         // Counters for stats
-         inline static uint32_t cpt[8] = {0};
-
+      template<class Uart>
+      struct StaticTiming {
          // Helper
-         static constexpr auto _ticks(float multiplier, const int ms) {
+         static auto _ticks(float multiplier, const int ms) {
             auto actual = Uart::get_byte_duration(multiplier);
             auto upto = std::chrono::duration_cast<asx::chrono::cpu_tick_t>(
                std::chrono::microseconds(ms)
@@ -67,13 +62,25 @@ namespace asx {
             return std::max(actual, upto);
          };
 
-         // Timing for the RTU. The T40 is used to prevent race when sending.
-         static constexpr auto T15 = _ticks(1.5, 750);
-         static constexpr auto T35 = _ticks(3.5, 1750);
-         static constexpr auto T40 = _ticks(4.0, 2000);
+         static auto count() {
+            return _ticks(4.0, 2000).count();
+         }
+
+         static auto t15() {
+            return _ticks(1.5, 750);
+         }
+
+         static auto t35() {
+            return _ticks(3.5, 1750);
+         }
+      };
+
+      template<class Datagram, class Uart, class T = StaticTiming<Uart>>
+      class Slave {
+         using Self = Slave;
 
          // Create a 4xT or 2ms timer - whichever is the longest
-         using Timer = asx::hw_timer::TimerA<T40.count()>;
+         using Timer = asx::hw_timer::TimerA<T>;
 
          inline static const auto must_reply = [](const t35_timeout&) {
             bool retval = false;
@@ -93,6 +100,10 @@ namespace asx {
             }
 
             return retval;
+         };
+
+         inline static const auto broadcast = []() {
+            return Datagram::get_buffer()[0] == 0;
          };
 
          struct StateMachine {
@@ -125,6 +136,7 @@ namespace asx {
                , "control_and_waiting"_s + event<t35_timeout>                            = "idle"_s
                , "reply"_s               + on_entry<_>                     / ready_reply
                , "reply"_s               + event<char_received>                          = "initial"_s // Unlikely - but a possibility
+               , "reply"_s               + event<t40_timeout> [broadcast]                = "idle"_s    // In broadcast - no answer
                , "reply"_s               + event<t40_timeout>                            = "emission"_s
                , "emission"_s            + on_entry<_>                     / reply
                , "emission"_s            + event<frame_sent>                             = "initial"_s
@@ -171,7 +183,7 @@ namespace asx {
             Uart::init();
 
             // Set the compare for T15 and T35
-            Timer::set_compare(T15, T35);
+            Timer::set_compare(T::t15(), T::t35());
 
             // Add reactor handler
             Timer::react_on_compare(
