@@ -50,17 +50,15 @@ namespace asx {
         struct Package
         {
             //! TWI chip address to communicate with.
-            char chip;
+            uint8_t chip;
             //! TWI address/commands to issue to the other chip (node).
             uint8_t addr[3];
             //! Length of the TWI data address segment (1-3 bytes).
-            int addr_length;
+            uint8_t addr_length;
             //! Where to find the data to be written.
             uint8_t *buffer;
             //! How many bytes do we want to write.
             uint8_t length;
-            //! Whether to wait if bus is busy (false) or return immediately (true)
-            bool no_wait;
             //! Callback when the operation is complete
             asx::reactor::Handle react_on_complete;
         };

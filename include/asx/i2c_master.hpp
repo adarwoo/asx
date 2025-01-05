@@ -101,7 +101,7 @@ namespace asx {
                 TWI0.MCTRLA = TWI_RIEN_bm | TWI_WIEN_bm | TWI_ENABLE_bm;
                 TWI0.MSTATUS = TWI_BUSSTATE_IDLE_gc;
 
-                status = status_code_t::STATUS_OK;                
+                status = status_code_t::STATUS_OK;
             }
 
             /// \brief Enable Master Mode of the TWI.
@@ -114,142 +114,19 @@ namespace asx {
                 TWI0.MCTRLA &= (~TWI_ENABLE_bm);
             }
 
-            /// @brief Initiate a i2c transfer (read/write/read+write)
-            /// The function initiate the transfer and return immediatly.
-            /// The reactor handle in the package is notified when the transfer is complete
-            /// @param package The package holding the information about the transfer
-            /// @param _read If true, reads, else write or write+read
-            static void transfer(Package &package, bool _read = false) {
-                pkg = &package;
-                addr_count = 0;
-                data_count = 0;
-                read = _read;
+            static void transfer(Package &package, bool _read = false);
 
-                uint8_t const chip = (pkg->chip) << 1;
-
-                // This API uses a reactor - so no colision should ever occur
-                alert_and_stop_if( not is_idle() );
-
-                // Writting the MADDR register kick starts things
-                if (pkg->addr_length || (false == read)) {
-                    TWI0.MADDR = chip;
-                } else if (read) {
-                    TWI0.MADDR = chip | 0x01;
-                }
-            }
-            
             /// \brief Test for an idle bus state.
             static inline bool is_idle () {
                 return ((TWI0.MSTATUS & TWI_BUSSTATE_gm)
                         == TWI_BUSSTATE_IDLE_gc);
             }
         private:
-            /**
-             * \internal
-             *
-             * \brief TWI master write interrupt handler.
-             *
-             *  Handles TWI transactions (master write) and responses to (N)ACK.
-             */
-            static inline void write_handler()
-            {
-                if (addr_count < pkg->addr_length)
-                {
-                    const uint8_t *const data = pkg->addr;
-                    TWI0.MDATA = data[addr_count++];
-                }
-                else if (data_count < pkg->length)
-                {
-
-                    if (read)
-                    {
-                        // Send repeated START condition (Address|R/W=1)
-                        TWI0.MADDR |= 0x01;
-                    }
-                    else
-                    {
-                        const uint8_t *const data = pkg->buffer;
-                        TWI0.MDATA = data[data_count++];
-                    }
-                }
-                else
-                {
-                    // Send STOP condition to complete the transaction
-                    TWI0.MCTRLB = TWI_MCMD_STOP_gc;
-                    status = status_code_t::STATUS_OK;
-
-                    // Notify the reactor
-                    pkg->react_on_complete(status_code_t::STATUS_OK);
-                }
-            }            
-
-            /**
-             * \internal
-             *
-             * \brief TWI master read interrupt handler.
-             *
-             *  This is the master read interrupt handler that takes care of
-             *  reading bytes from the TWI slave.
-             */
-            static inline void read_handler(void)
-            {
-                if (data_count < pkg->length) {
-                    uint8_t *const data = pkg->buffer;
-
-                    data[data_count++] = TWI0.MDATA;
-
-                    /* If there is more to read, issue ACK and start a byte read.
-                    * Otherwise, issue NACK and STOP to complete the transaction.
-                    */
-                    if (data_count < pkg->length) {
-                        TWI0.MCTRLB = TWI_MCMD_RECVTRANS_gc;
-                    } else {
-                        TWI0.MCTRLB = TWI_ACKACT_bm | TWI_MCMD_STOP_gc;
-                        status = status_code_t::STATUS_OK;
-
-                        pkg->react_on_complete(status_code_t::STATUS_OK);
-                    }
-                } else {
-                    /* Issue STOP and buffer overflow condition. */
-                    TWI0.MCTRLB = TWI_MCMD_STOP_gc;
-                    status = status_code_t::ERR_NO_MEMORY;
-
-                    pkg->react_on_complete(status_code_t::STATUS_OK);
-                }
-            }
+            static void write_handler();
+            static void read_handler(void);
 
         public: // Evil but required for the interrupt with a C linkage
-            /**
-             * \internal
-             *
-             * \brief Common TWI master interrupt service routine.
-             *
-             *  Check current status and calls the appropriate handler.
-             */
-            static inline void interrupt_handler() {
-                uint8_t const master_status = TWI0.MSTATUS;
-
-                if (master_status & TWI_ARBLOST_bm) {
-                    TWI0.MSTATUS = master_status | TWI_ARBLOST_bm;
-                    TWI0.MCTRLB = TWI_MCMD_STOP_gc;
-                    status = status_code_t::ERR_BUSY;
-
-                    pkg->react_on_complete(status_code_t::ERR_BUSY);
-                } else if ((master_status & TWI_BUSERR_bm) || (master_status & TWI_RXACK_bm)) {
-                    TWI0.MCTRLB = TWI_MCMD_STOP_gc;
-                    status = status_code_t::ERR_IO_ERROR;
-
-                    pkg->react_on_complete(status_code_t::ERR_IO_ERROR);
-                } else if (master_status & TWI_WIF_bm) {
-                    write_handler();
-                } else if (master_status & TWI_RIF_bm) {
-                    read_handler();
-                } else {
-                    status = status_code_t::ERR_PROTOCOL;
-
-                    pkg->react_on_complete(status_code_t::ERR_PROTOCOL);
-                }
-            }
+            static void interrupt_handler();
         };
     } // i2c
 } // asx

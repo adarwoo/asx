@@ -1,74 +1,55 @@
-#include <stdint.h>
+#pragma once
+#include <asx/i2c_master.hpp>
 
-namespace pca9555
-{
-   static constexpr auto base_address = 0b0100000;
-
-   enum command_type : uint8_t
-   {
-      read = 0,
-      write = 2,
-      set_polarity = 4,
-      configure = 6,
-   };
-   
-   template<uint8_t ADDRESS, uint16_t dir, uint16_t pol>
-   class PCA9555
-   {
-      ///< Address of the device
-      static constexpr uint8_t address = base_address | ADDRESS;
-      ///< Buffer to receive data
-      uint8_t buffer[2];
-
-   public:
-      static init(reactor::Handle complete) {
-         static auto bind_this = [this, complete]() {
-            this->init(complete);
+namespace asx {
+   namespace i2c {
+      class PCA9555 {
+         enum class operation_t : uint8_t {
+            conf_dir,
+            conf_pol,
+            conf_output,
          };
 
-         static auto react_this = reactor::bind(bind_this);
+         enum class command_t : uint8_t
+         {
+            read = 0,
+            write = 2,
+            set_polarity = 4,
+            set_dir = 6,
+         };
 
-         if ( init_stage == conf_dir ) {
-            I2CM::write(...., react_this, state::conf_pol, );
-         } else if () {
-            I2CM::write(...., reactor::bind(init), state::conf_done, );
-         } else {
-            reactor::notify(complete);
+         static constexpr auto base_chip_address = uint8_t{0b0100000};
+
+         ///< Common Buffer to receive data
+         static inline uint8_t buffer[2] = {};
+
+         ///< Address of the device
+         uint8_t chip;
+
+      public:
+         PCA9555(uint8_t _chip);
+
+         void read(reactor::Handle react = reactor::null);
+
+         void set_value(uint16_t value, reactor::Handle react = reactor::null) {
+            transfer(command_t::write, value, react);
          }
-      }
 
-      void read(reactor::handle on_complete); // Pass a uint16_t
-      void readwrite(uint16_t to_write, reactor::handle on_complete); // Pass a uint16_t
+         void set_dir(uint16_t dir, reactor::Handle react = reactor::null) {
+            transfer(command_t::set_dir, dir, react);
+         }
 
-   private:
-      void write(command_type, uint16_t);
-   };   
+         void set_pol(uint16_t pol, reactor::Handle react = reactor::null) {
+            transfer(command_t::set_polarity, pol, react);
+         }
 
-
-   using Pca1 = PCA9555<2, 0xFFFF, 0>;
-   using Pca2 = PCA9555<3, 0, 0xFFFF>;
-
-   // The main app owns the i2c
-
-   // Cascade the initialisation of both i2c
-   auto react_on_sample_i2c = reactor::bind(on_sample_i2c);
-
-   auto iomux_1 = i2cPca1.init(reactor::bind(i2cPca2.init(react_on_sample_i2c));
-
-   void on_sample_i2c()
-   {
-      static auto react_on_pca1_result = reactor::bind(on_pca1_result);
-
-      i2cPca1.readwrite(fb.low, react_on_pca1_result);
+         ///< Access the common read buffer
+         static uint16_t get_value() {
+            return buffer[1]<<8 | buffer[0];
+         }
+      private:
+         // Set a value and read
+         void transfer(command_t op, uint16_t value, reactor::Handle react);
+      };
    }
-   
-
-   auto pca2 = i2cmaster[0]; // Get the first slave
-
-   pca1.request(on_)
-
-   // In main
-
-
-
 }

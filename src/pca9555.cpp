@@ -1,49 +1,35 @@
-#include <avr/io.h>
-#include "twim.h"
-#include "reactor.h"
-#include "pca9555.h"
+#include <asx/pca9555.hpp>
 
-namespace pca9555 {
-
-   /**
-    * Called from the interrupt
-    */
-   static inline void _i2c_on_complete(status_code_t status)
-   {
-      twim_release();
-   
-      if ( status == STATUS_OK )
-      {
+namespace asx {
+   namespace i2c {
+      namespace {
+         ///< Package
+         static i2c::Package package;
       }
-      else
-      {
+
+      PCA9555::PCA9555(uint8_t _chip) {
+         chip = base_chip_address | _chip;
+         package.buffer = buffer;
       }
-   }
 
-   void pca9555::write(command_type cmd, uint16_t value)
-   {
-      static twi_package_t package;
+      void PCA9555::read(reactor::Handle react) {
+         package.chip = chip;
+         package.addr[0] = (uint8_t)command_t::read;
+         package.react_on_complete = react;
+         package.addr_length = 1;
+         Master::transfer(package, true);
+      }
 
-      buffer[0] = value >> 8;
-      buffer[1] = value & 0xff;
+      // Set a value and read
+      void PCA9555::transfer(command_t op, uint16_t value, reactor::Handle react) {
+         package.chip = chip;
+         package.addr[0] = (uint8_t)op;
+         package.addr[1] = value >> 8;
+         package.addr[2] = value & 0xff;
+         package.addr_length = 3;
+         package.react_on_complete = react;
 
-      package.chip = address | base_address;
-      package.addr[0] = cmd;
-      package.addr_length = 1;
-      package.buffer = &buffer;
-      package.length = 2;
-      package.no_wait = true; // Let the reactor take care
-      package.complete_cb = _i2c_on_complete;
-
-      // Send the read request as a repeated start to the receiver
-      status_code_t status = twi_master_write(&TWI0, &package);
-   
-      // The reactor will have some data to process once the send is over
-      // If an error is return, report it
-      if ( status != STATUS_OK )
-      {
-         //reactor_notify(on_error, (void *)status);
+         Master::transfer(package);
       }
    }
-  
 }

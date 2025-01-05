@@ -25,6 +25,10 @@ ifneq ($(filter modbus_rtu,$(ASX_USE)),)
 ASX_USE+=hw_timer reactor timer uart logger
 endif
 
+ifneq ($(filter i2c_master,$(ASX_USE)),)
+ASX_USE+=reactor timer logger
+endif
+
 # Append ASX code files
 SRCS+=\
    $(ASX_PATH)src/builtin.cpp \
@@ -38,6 +42,8 @@ SRCS+=\
    $(if $(filter modbus_rtu,$(ASX_USE)), $(ASX_PATH)src/modbus_rtu.cpp, ) \
    $(if $(filter hw_timer,$(ASX_USE)), $(ASX_PATH)src/hw_timer.cpp, ) \
    $(if $(filter eeprom,$(ASX_USE)), $(ASX_PATH)src/eeprom.cpp, ) \
+   $(if $(filter i2c_master,$(ASX_USE)), $(ASX_PATH)src/i2c_master.cpp, ) \
+   $(if $(filter pca9555,$(ASX_USE)), $(ASX_PATH)src/pca9555.cpp, ) \
 
 ifneq ($(filter modbus_rtu,$(ASX_USE)),)
 ASX_USE+=hw_timer reactor timer uart logger
