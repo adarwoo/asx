@@ -44,6 +44,7 @@ SRCS+=\
    $(if $(filter eeprom,$(ASX_USE)), $(ASX_PATH)src/eeprom.cpp, ) \
    $(if $(filter i2c_master,$(ASX_USE)), $(ASX_PATH)src/i2c_master.cpp, ) \
    $(if $(filter pca9555,$(ASX_USE)), $(ASX_PATH)src/pca9555.cpp, ) \
+   $(if $(filter piezzo,$(ASX_USE)), $(ASX_PATH)src/piezzo.c, ) \
 
 ifneq ($(filter modbus_rtu,$(ASX_USE)),)
 ASX_USE+=hw_timer reactor timer uart logger

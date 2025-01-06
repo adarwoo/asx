@@ -52,7 +52,7 @@ namespace asx {
       };
 
       // Compile-time configuration Config
-      template<size_t BAUD, width W, parity P, stop S, int OPTIONS = 0>
+      template<uint32_t BAUD, width W, parity P, stop S, int OPTIONS = 0>
       struct CompileTimeConfig {
          static consteval void init() {}
          static consteval width get_width() { return W; }

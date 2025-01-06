@@ -1,4 +1,4 @@
-/**
+   /**
  * @addtogroup service
  * @{
  * @addtogroup piezzo
@@ -23,6 +23,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+#include "board.h"
 #include "ioport.h"
 #include "reactor.h"
 #include "timer.h"
@@ -34,22 +35,31 @@
 /* Defines                                                              */
 /************************************************************************/
 
-/**
- * @def PIEZZO_TCB_NUMBER
- * Default the TCB timer number is 0 for TCB0. Overwrite in conf_board.h with 1 if required.
- */
-#ifndef PIEZZO_TCB_NUMBER
-#define PIEZZO_TCB_NUMBER 0
-#endif
-
 /** @def PIEZZO_PRIO
  * Override the reactor priority of the digital output handler
  */
 #ifndef PIEZZO_PRIO
-#define PIEZZO_PRIO reactor_prio_realtime
+#define PIEZZO_PRIO reactor_prio_high
 #endif
 
-#define PIEZZO_TCB TCA0
+#ifndef PIEZZO_TCB_NUMBER
+#  define PIEZZO_TCB_NUMBER 0
+#endif
+
+#ifndef TIMER_TCB_NUMBER
+#  define TIMER_TCB_NUMBER 1
+#endif
+
+#if PIEZZO_TCB_NUMBER == 0
+#  define PIEZZO_TCB TCB0
+#else
+#  define PIEZZO_TCB TCB1
+#endif
+
+#if PIEZZO_TCB_NUMBER == TIMER_TCB_NUMBER
+#  error Conflicting TIMERB allocation
+#endif
+
 
 /** Duration of a full note at 1 beat per minutes in ms (4(full) * 60(seconds) * 1000(ms)) */
 #define TEMPO_FULL_NOTE_PERIOD 240000UL
@@ -135,16 +145,16 @@ static inline uint16_t _get_cmp_value(void)
 
 static inline void _set_timer_compare_period(uint16_t new_tc_value)
 {
-   PIEZZO_TCB.SINGLE.CNT = 0;
-   PIEZZO_TCB.SINGLE.CMP0 = new_tc_value;
+   PIEZZO_TCB.CNT = 0;
+   PIEZZO_TCB.CCMP = new_tc_value;
 
    // Enable the compare
-   PIEZZO_TCB.SINGLE.CTRLB |= TCA_SINGLE_CMP2EN_bm;
+   PIEZZO_TCB.CTRLB |= TCB_CCMPEN_bm;
 }
 
 static inline void _stop_timer_compare(void)
 {
-   PIEZZO_TCB.SINGLE.CTRLB &= ~TCA_SINGLE_CMP2EN_bm;
+   PIEZZO_TCB.CTRLB &= ~TCB_CCMPEN_bm;
 }
 
 /** Internal parse a single note and change all global variables */
@@ -314,11 +324,16 @@ void piezzo_init(void)
    // Ready the PWM
 #ifndef _WIN32
    // Use the Timer type A to drive the piezzo transistor directly
-   PIEZZO_TCB.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1_gc | TCA_SINGLE_ENABLE_bm;
-   PIEZZO_TCB.SINGLE.CTRLB = TCA_SINGLE_WGMODE_FRQ_gc;
+   PIEZZO_TCB.CTRLA = TCB_CLKSEL_DIV1_gc | TCB_ENABLE_bm;
+   PIEZZO_TCB.CTRLB = TCB_CNTMODE_INT_gc;
 
-   // The channel 0 controls the period. Simply keep the compare for channel 2 at 0
-   PIEZZO_TCB.SINGLE.CMP2 = 0;
+   // Set the WO.x as output
+   #if PIEZZO_TCB_NUMBER == 0
+      PORTA_DIRSET = _BV(5);
+   #else
+      PORTA_DIRSET = _BV(3);
+   #endif
+
 #endif
    // This timer does not have a PWM output when using all 16bits.
 
