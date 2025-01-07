@@ -1,5 +1,6 @@
 #pragma once
 #include <asx/i2c_master.hpp>
+#include <type_traits>
 
 namespace asx {
    namespace i2c {
@@ -12,10 +13,14 @@ namespace asx {
 
          enum class command_t : uint8_t
          {
-            read = 0,
-            write = 2,
-            set_polarity = 4,
-            set_dir = 6,
+            read0 = 0,
+            read1 = 1,
+            write0 = 2,
+            write1 = 3,
+            set_pol0 = 4,
+            set_pol1 = 5,
+            set_dir0 = 6,
+            set_dir1 = 7,
          };
 
          static constexpr auto base_chip_address = uint8_t{0b0100000};
@@ -32,24 +37,73 @@ namespace asx {
          void read(reactor::Handle react = reactor::null);
 
          void set_value(uint16_t value, reactor::Handle react = reactor::null) {
-            transfer(command_t::write, value, react);
+            transfer(command_t::write0, value, react);
          }
 
          void set_dir(uint16_t dir, reactor::Handle react = reactor::null) {
-            transfer(command_t::set_dir, dir, react);
+            transfer(command_t::set_dir0, dir, react);
          }
 
          void set_pol(uint16_t pol, reactor::Handle react = reactor::null) {
-            transfer(command_t::set_polarity, pol, react);
+            transfer(command_t::set_pol0, pol, react);
          }
 
-         ///< Access the common read buffer
-         static uint16_t get_value() {
-            return buffer[1]<<8 | buffer[0];
+         template<unsigned PORT>
+         void read(reactor::Handle react = reactor::null) {
+            static_assert(PORT==0 or PORT==1, "Invalid port");
+            if constexpr ( PORT == 0 ) {
+               read(command_t::read0, react);
+            } else {
+               read(command_t::read1, react);
+            }
+         }
+
+         template<unsigned PORT>
+         void set_value(uint8_t value, reactor::Handle react = reactor::null) {
+            static_assert(PORT==0 or PORT==1, "Invalid port");
+            if constexpr ( PORT == 0 ) {
+               transfer(command_t::write0, value, react);
+            } else {
+               transfer(command_t::write1, value, react);
+            }
+         }
+
+         template<unsigned PORT>
+         void set_dir(uint8_t dir, reactor::Handle react = reactor::null) {
+            static_assert(PORT==0 or PORT==1, "Invalid port");
+            if constexpr ( PORT == 0 ) {
+               transfer(command_t::set_dir0, dir, react);
+            } else {
+               transfer(command_t::set_dir1, dir, react);
+            }
+         }
+
+         template<unsigned PORT>
+         void set_pol(uint8_t pol, reactor::Handle react = reactor::null) {
+            static_assert(PORT==0 or PORT==1, "Invalid port");
+            if constexpr ( PORT == 0 ) {
+               transfer(command_t::set_pol0, pol, react);
+            } else {
+               transfer(command_t::set_pol1, pol, react);
+            }
+         }
+
+         // General template for 16-bit types
+         template<unsigned PORT>
+         static uint8_t get_value() {
+            static_assert(PORT==0 or PORT==1, "Invalid port");
+            return buffer[PORT];
+         }
+
+         // Specialization for 8-bit types
+         static uint16_t get_values() {
+            return buffer[1] << 8 | buffer[0];
          }
       private:
          // Set a value and read
          void transfer(command_t op, uint16_t value, reactor::Handle react);
+
+         void read(command_t op, reactor::Handle react);
       };
    }
 }

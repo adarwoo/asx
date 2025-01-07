@@ -12,9 +12,9 @@ namespace asx {
          package.buffer = buffer;
       }
 
-      void PCA9555::read(reactor::Handle react) {
+      void PCA9555::read(command_t op, reactor::Handle react) {
          package.chip = chip;
-         package.addr[0] = (uint8_t)command_t::read;
+         package.addr[0] = (uint8_t)op;
          package.react_on_complete = react;
          package.addr_length = 1;
          Master::transfer(package, true);
