@@ -21,6 +21,11 @@ namespace asx {
          illegal_function_code = 0x01, // Modbus standard for illegal function code
          illegal_data_address = 0x02,
          illegal_data_value = 0x03,
+         slave_device_failure = 0x04,
+         acknowledge = 0x05,
+         slave_device_busy = 0x06,
+         negative_acknowledge = 0x07,
+         memory_parity_error = 0x08,
          ignore_frame = 255
       };
 
