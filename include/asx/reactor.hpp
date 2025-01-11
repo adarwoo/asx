@@ -91,14 +91,12 @@ namespace asx {
          }
 
          // Notify in the future
-         inline timer::Instance delay(timer::duration after)
-         {
+         inline timer::Instance delay(timer::duration after) {
             return timer_arm(handle, clock::to_timer_count(clock::now() + after), 0, nullptr);
          }
 
          // Notify in the future
-         inline timer::Instance repeat(timer::duration after, timer::duration repeat)
-         {
+         inline timer::Instance repeat(timer::duration after, timer::duration repeat) {
             return timer_arm(
                handle,
                clock::to_timer_count(clock::now() + after),
@@ -110,8 +108,7 @@ namespace asx {
          /**
           * Start repeating invocations after 'repeat'
           */
-         inline timer::Instance repeat(timer::duration repeat)
-         {
+         inline timer::Instance repeat(timer::duration repeat) {
             return timer_arm(
                handle,
                clock::to_timer_count(clock::now() + repeat),
@@ -138,7 +135,7 @@ namespace asx {
          }
 
          inline void clear() {
-            reactor_clear( 1<<handle );
+            reactor_clear( 1UL << handle );
          }
 
          template <typename T>

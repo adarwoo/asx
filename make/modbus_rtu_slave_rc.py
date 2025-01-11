@@ -424,18 +424,18 @@ class TransitionGroup:
                 retval += to_append
                 test_cnt += 1 if has_test else 0
 
-            if test_cnt:
+            if test_cnt > 0:
                 retval = data + retval + f" else {{"
 
                 if self.pos == 0:
                     retval += f"\n{tab}{extra}{INDENT}error = error_t::ignore_frame;"
-                    retval += f"\n{tab}{extra}{INDENT}state = state_t::IGNORE"
+                    retval += f"\n{tab}{extra}{INDENT}state = state_t::IGNORE;"
                 elif self.pos == 1:
                     retval += f"\n{tab}{extra}{INDENT}error = error_t::illegal_function_code;"
-                    retval += f"\n{tab}{extra}{INDENT}state = state_t::ERROR"
+                    retval += f"\n{tab}{extra}{INDENT}state = state_t::ERROR;"
                 else:
                     retval += f"\n{tab}{extra}{INDENT}error = error_t::illegal_data_value;"
-                    retval += f"\n{tab}{extra}{INDENT}state = state_t::ERROR"
+                    retval += f"\n{tab}{extra}{INDENT}state = state_t::ERROR;"
             else:
                 pass
 
@@ -443,10 +443,10 @@ class TransitionGroup:
                 return retval
         else:
             t=self.transitions[0]
-            return f"{tab}if ( cnt == {self.pos+size} ) {{\n{tab}{INDENT}state = state_t::{t.next.name}"
+            return f"{tab}if ( cnt == {self.pos+size} ) {{\n{tab}{INDENT}state = state_t::{t.next.name};"
 
         if ( test_cnt ):
-            return f"{tab}if ( cnt == {self.pos+size} ) {{\n{retval};\n{INDENT}{tab}}}"
+            return f"{tab}if ( cnt == {self.pos+size} ) {{\n{retval}\n{INDENT}{tab}}}"
 
         return f"{tab}if ( cnt == {self.pos+size} ) {{\n{retval}"
 
@@ -548,7 +548,11 @@ class State:
         for tg in transition_groups.values():
             retval += tg.to_code(indent+1)
 
-        return retval + f";\n{tab}{INDENT}}}\n{tab}{INDENT}break;\n"
+        if '{' in retval:
+            return retval + f"\n{tab}{INDENT}}}\n{tab}{INDENT}break;\n"
+
+        return retval + f"\n{tab}{INDENT}break;\n"
+
 
 class OperationState(State):
     def __init__(self, op, name, pos=0):

@@ -1,16 +1,20 @@
+#include "board.h"
 #include <avr/interrupt.h>
 #include <asx/i2c_master.hpp>
+#include <alert.h>
 
-extern "C"
-{
-    // Interrupt handler
-    ISR(TWI0_TWIM_vect) {
-        asx::i2c::Master::interrupt_handler();
-    }
-}
 
 namespace asx {
    namespace i2c {
+      void Master::init(const unsigned long bus_speed_hz) {
+            TWI0.MBAUD = calc_baud(bus_speed_hz);
+            TWI0.MCTRLB |= TWI_FLUSH_bm;
+            TWI0.MCTRLA = TWI_RIEN_bm | TWI_WIEN_bm | TWI_ENABLE_bm;
+            TWI0.MSTATUS = TWI_BUSSTATE_IDLE_gc;
+
+            status = status_code_t::STATUS_OK;
+      }
+
       void Master::write_handler() {
          if (addr_count < pkg->addr_length) {
             const uint8_t *const data = pkg->addr;
@@ -119,3 +123,10 @@ namespace asx {
    }
 }
 
+extern "C"
+{
+    // Interrupt handler
+    ISR(TWI0_TWIM_vect) {
+        asx::i2c::Master::interrupt_handler();
+    }
+}

@@ -189,22 +189,50 @@ void reactor_run(void)
       }
       else
       {
-         // At least 1 flag set
-         uint8_t handle = __builtin_ctzl(_reactor_notifications);
-
-         // Flip the flag before calling - so it could be set again by the caller
-         {
-            uint8_t bit_shift = bit_shift_table[handle % 8];
-            uint8_t *pNotif = (uint8_t*)&_reactor_notifications;
-            uint8_t byte_index = handle / 8;
-
-            pNotif[byte_index] ^= bit_shift;
+         uint8_t index;
+         
+         if (GPIO0 != 0) {
+            /**/ if (GPIO0 & 1U)  { index = 0; GPIO0 &= (~1U); }
+            else if (GPIO0 & 2U)  { index = 1; GPIO0 &= (~2U); }
+            else if (GPIO0 & 4U)  { index = 2; GPIO0 &= (~4U); }
+            else if (GPIO0 & 8U)  { index = 3; GPIO0 &= (~8U); }
+            else if (GPIO0 & 16U) { index = 4; GPIO0 &= (~16U); }
+            else if (GPIO0 & 32U) { index = 5; GPIO0 &= (~32U); }
+            else if (GPIO0 & 64U) { index = 6; GPIO0 &= (~64U); }
+            else if (GPIO0 & 128U){ index = 7; GPIO0 &= (~128U); }
+         } else if (GPIO1 != 0) {
+            /**/ if (GPIO1 & 1U)  { index = 8;  GPIO1 &= (~1U); }
+            else if (GPIO1 & 2U)  { index = 9;  GPIO1 &= (~2U); }
+            else if (GPIO1 & 4U)  { index = 10; GPIO1 &= (~4U); }
+            else if (GPIO1 & 8U)  { index = 11; GPIO1 &= (~8U); }
+            else if (GPIO1 & 16U) { index = 12; GPIO1 &= (~16U); }
+            else if (GPIO1 & 32U) { index = 13; GPIO1 &= (~32U); }
+            else if (GPIO1 & 64U) { index = 14; GPIO1 &= (~64U); }
+            else if (GPIO1 & 128U){ index = 15; GPIO1 &= (~128U); }
+         } else if (GPIO2 != 0) {
+            /**/ if (GPIO2 & 1U)  { index = 16; GPIO2 &= (~1U); }
+            else if (GPIO2 & 2U)  { index = 17; GPIO2 &= (~2U); }
+            else if (GPIO2 & 4U)  { index = 18; GPIO2 &= (~4U); }
+            else if (GPIO2 & 8U)  { index = 19; GPIO2 &= (~8U); }
+            else if (GPIO2 & 16U) { index = 20; GPIO2 &= (~16U); }
+            else if (GPIO2 & 32U) { index = 21; GPIO2 &= (~32U); }
+            else if (GPIO2 & 64U) { index = 22; GPIO2 &= (~64U); }
+            else if (GPIO2 & 128U){ index = 23; GPIO2 &= (~128U); }
+         } else {
+            /**/ if (GPIO3 & 1U)  { index = 24; GPIO3 &= (~1U); }
+            else if (GPIO3 & 2U)  { index = 25; GPIO3 &= (~2U); }
+            else if (GPIO3 & 4U)  { index = 26; GPIO3 &= (~4U); }
+            else if (GPIO3 & 8U)  { index = 27; GPIO3 &= (~8U); }
+            else if (GPIO3 & 16U) { index = 28; GPIO3 &= (~16U); }
+            else if (GPIO3 & 32U) { index = 29; GPIO3 &= (~32U); }
+            else if (GPIO3 & 64U) { index = 30; GPIO3 &= (~64U); }
+            else if (GPIO3 & 128U){ index = 31; GPIO3 &= (~128U); }
          }
 
          sei();
 
          debug_set(REACTOR_BUSY);
-         _handlers[handle].handler(_handlers[handle].arg);
+         _handlers[index].handler(_handlers[index].arg);
 
          // Keep the system alive for as long as the reactor is calling handlers
          // We assume that if no handlers are called, the system is dead.

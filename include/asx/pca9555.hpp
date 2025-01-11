@@ -102,6 +102,7 @@ namespace asx {
       private:
          // Set a value and read
          void transfer(command_t op, uint16_t value, reactor::Handle react);
+         void transfer(command_t op, uint8_t value, reactor::Handle react);
 
          void read(command_t op, reactor::Handle react);
       };

@@ -25,7 +25,7 @@ namespace asx {
          write_single_register = 6,
          write_multiple_coils = 15,
          write_multiple_registers = 16,
-         read_write_multiple_registers = 23
+         read_write_multiple_registers = 23,
          custom = 101
       };
 
@@ -61,7 +61,7 @@ namespace asx {
          uint16_t update(std::string_view view);
       };
 
-      struct can_start_receiving {};
+      struct can_start {};
       struct t15_timeout {};
       struct t35_timeout {};
       struct t40_timeout {};
@@ -141,7 +141,7 @@ namespace asx {
                };
 
                return make_transition_table(
-               * "cold"_s                + event<can_start_receiving>                    = "initial"_s
+               * "cold"_s                + event<can_start>                              = "initial"_s
                , "initial"_s             + on_entry<_>                     / start_timer
                , "initial"_s             + event<t35_timeout>                            = "idle"_s
                , "initial"_s             + event<char_received>            / start_timer = "initial"_s
@@ -205,20 +205,20 @@ namespace asx {
 
             // Add reactor handler
             Timer::react_on_compare(
-               reactor::bind(on_timeout_t15),
-               reactor::bind(on_timeout_t35)
+               reactor::bind(on_timeout_t15, reactor::high),
+               reactor::bind(on_timeout_t35, reactor::high)
             );
 
-            Timer::react_on_overflow(reactor::bind(on_timeout_t40));
+            Timer::react_on_overflow(reactor::bind(on_timeout_t40, reactor::low));
 
             // Add reactor handler for the Uart
-            Uart::react_on_character_received(reactor::bind(on_rx_char));
+            Uart::react_on_character_received(reactor::bind(on_rx_char,reactor::high));
 
             // Add a reactor handler for when the transmit is complete
-            Uart::react_on_send_complete(reactor::bind(on_send_complete));
+            Uart::react_on_send_complete(reactor::bind(on_send_complete, reactor::high));
 
             // Start the SM
-            sm.process_event(can_start_receiving{});
+            sm.process_event(can_start{});
          }
 
          static void on_rx_char(uint8_t c) {
@@ -256,8 +256,9 @@ namespace asx {
 
                auto start_timer = [] () { Timer::start(); };
                auto reset       = [] () { Datagram::reset(); };
-               auto ready_reply = [] () { Datagram::ready_reply(); };
+               auto process_reply = [] () { Datagram::ready_reply(); };
                auto transmit    = [] () { Uart::send(Datagram::get_buffer()); };
+               auto timeout_error = [](){ };
 
                auto handle_char = [] (const auto& event) {
                   Timer::start(); // Restart the timers (15/35/40)
@@ -265,7 +266,7 @@ namespace asx {
                };
 
                return make_transition_table(
-               * "cold"_s                + event<can_start_sending>                 = "initial"_s
+               * "cold"_s                + event<can_start>                         = "initial"_s
                , "initial"_s             + on_entry<_>              / start_timer
                , "initial"_s             + event<t35_timeout>                       = "idle"_s
                , "initial"_s             + event<char_received>     / start_timer   = "initial"_s
@@ -277,7 +278,6 @@ namespace asx {
                , "waiting_for_reply"_s   + event<t100ms_timeout>    / timeout_error = "idle"_s
                , "reception"_s           + event<t15_timeout>                       = "control_and_waiting"_s
                , "reception"_s           + event<char_received>     / handle_char   = "reception"_s
-               , "control_and_waiting"_s + event<char_received>     / bus_error     = "initial"_s
                , "control_and_waiting"_s + event<t35_timeout>       / process_reply = "idle"_s
                );
             }
@@ -330,7 +330,7 @@ namespace asx {
                reactor::bind(on_timeout_t35)
             );
 
-            Timer::react_on_overflow(reactor::bind(on_timeout_t40));
+            Timer::react_on_overflow(reactor::bind(on_reply_timeout));
 
             // Add reactor handler for the Uart
             Uart::react_on_character_received(reactor::bind(on_rx_char));
@@ -339,7 +339,7 @@ namespace asx {
             Uart::react_on_send_complete(reactor::bind(on_send_complete));
 
             // Start the SM
-            sm.process_event(can_start_receiving{});
+            sm.process_event(can_start{});
          }
 
          static void on_rx_char(uint8_t c) {
@@ -354,7 +354,7 @@ namespace asx {
             sm.process_event(t35_timeout{});
          }
 
-         static void on_t100ms_timeout() {
+         static void on_reply_timeout() {
             sm.process_event(t100ms_timeout{});
          }
 
