@@ -160,7 +160,10 @@ void reactor_notify( reactor_handle_t handle, void *data )
  */
 void reactor_clear(reactor_mask_t mask)
 {
+   // Make atomic to prevent race (notification can be set from ISR)
+   cli();
     _reactor_notifications &= ~(mask);
+   sei();
 }
 
 /** Process the reactor loop */
@@ -191,6 +194,7 @@ void reactor_run(void)
       {
          uint8_t index;
          
+         // This approach sacrifices text size over speed
          if (GPIO0 != 0) {
             /**/ if (GPIO0 & 1U)  { index = 0; GPIO0 &= (~1U); }
             else if (GPIO0 & 2U)  { index = 1; GPIO0 &= (~2U); }

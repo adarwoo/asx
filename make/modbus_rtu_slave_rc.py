@@ -263,6 +263,21 @@ class Matcher:
 
         self.pos = None # To be set later
 
+    def __eq__(self, other):
+        if not isinstance(other, Matcher):
+            return False  # Not comparable with non-Matcher types
+
+        # Compare class types
+        if self.__class__ != other.__class__:
+            return False
+
+        # Compare the `value` attribute
+        if self.value != other.value:
+            return False
+
+        # If all checks pass, the objects are equal
+        return True
+
     def cast(self, value):
         """Check and return the value if valid, otherwise raise an error."""
         if self.check(value):
@@ -315,6 +330,9 @@ class Range:
         self._to = to_value
     def __repr__(self):
         return f"[{self._from}-{self._to}]"
+
+    def __eq__(self, other):
+        return self._from == other._from and self._to == other._to
 
 class UnsignedMatcher(Matcher):
     """Matcher for unsigned integral types."""

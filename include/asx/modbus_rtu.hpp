@@ -203,6 +203,9 @@ namespace asx {
             // Set the compare for T15 and T35
             Timer::set_compare(T::t15(), T::t35());
 
+            // Add reactor handler for the Uart (first - so it takes priority)
+            Uart::react_on_character_received(reactor::bind(on_rx_char, reactor::high));
+
             // Add reactor handler
             Timer::react_on_compare(
                reactor::bind(on_timeout_t15, reactor::high),
@@ -210,9 +213,6 @@ namespace asx {
             );
 
             Timer::react_on_overflow(reactor::bind(on_timeout_t40, reactor::low));
-
-            // Add reactor handler for the Uart
-            Uart::react_on_character_received(reactor::bind(on_rx_char,reactor::high));
 
             // Add a reactor handler for when the transmit is complete
             Uart::react_on_send_complete(reactor::bind(on_send_complete, reactor::high));
