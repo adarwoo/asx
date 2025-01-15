@@ -16,6 +16,7 @@ namespace asx {
          package.chip = chip;
          package.addr[0] = (uint8_t)op;
          package.addr_length = 1;
+         package.length = 1; // Number of bytes to read
          package.react_on_complete = react;
          Master::transfer(package, true);
       }

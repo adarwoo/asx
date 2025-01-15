@@ -87,18 +87,18 @@ namespace asx {
                transfer(command_t::set_pol1, pol, react);
             }
          }
-
-         // General template for 16-bit types
-         template<unsigned PORT>
-         static uint8_t get_value() {
-            static_assert(PORT==0 or PORT==1, "Invalid port");
-            return buffer[PORT];
+         
+         template <typename T>
+         T get_value() {
+            static_assert(std::is_same_v<T, uint8_t> || std::is_same_v<T, uint16_t>,
+               "Only uint8_t or uint16_t are supported.");
+            if constexpr (std::is_same_v<T, uint8_t>) {
+               return buffer[0];
+               } else { // T is uint16_t
+               return (static_cast<uint16_t>(buffer[0]) << 8) | buffer[1];
+            }
          }
 
-         // Specialization for 8-bit types
-         static uint16_t get_values() {
-            return buffer[1] << 8 | buffer[0];
-         }
       private:
          // Set a value and read
          void transfer(command_t op, uint16_t value, reactor::Handle react);
