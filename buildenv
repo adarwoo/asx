@@ -32,13 +32,13 @@ base_opts="-u $(id -u $USER):$(getent group docker | cut -d: -f3) -v ${mountdir}
 workdir="$(realpath $(pwd))"
 
 # Name the runtime container uniquely
-container_name="AVR_$(id -u)_$(date +%Y%m%d-%H%M%S)"
+container_name="ASX_$(id -u)_$(date +%Y%m%d-%H%M%S)"
 
 # Detect number of CPUs. Environment variable J can override the value. If no value given, then 1 is used
 if [[ -v J ]]; then
-   ((core_count=j)); ((core_count)) || let core_count=1
+   ((core_count=J)); ((core_count)) || let core_count=1
 else
-   core_count=$(grep ^cpu\\scores /proc/cpuinfo | uniq |  awk '{print $4}')
+   core_count=$(nproc)
 fi
 
 # Run make or start a shell

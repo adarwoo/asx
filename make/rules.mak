@@ -13,7 +13,6 @@ ifeq ($(SWITCH_TO_DOCKER),yes)
 CURRENT_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 ASX_DIR := $(dir $(abspath $(CURRENT_MAKEFILE)/..))
 
-
 # Not in Docker, respawn inside Docker
 DOCKER_RUN_CMD := $(ASX_DIR)buildenv make
 CMD_VARS=$(strip \

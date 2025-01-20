@@ -69,7 +69,7 @@ namespace asx {
          using value_t = Counting16;
          using self = TimerA;
 
-         static inline reactor::mask clear_masks = 0;
+         static inline reactor::Mask clear_masks{0};
 
          ///< @brief Possible prescaling values
          static constexpr TCA_SINGLE_CLKSEL_t clksel[] = {
@@ -117,15 +117,15 @@ namespace asx {
                if (cmp_index==0) {
                   on_timera_compare0 = h;
                   TCA().INTCTRL |= TCA_SINGLE_CMP0_bm;
-                  clear_masks |= reactor::mask_of(h);
+                  clear_masks.append(h);
                } else if (cmp_index==1) {
                   on_timera_compare1 = h;
                   TCA().INTCTRL |= TCA_SINGLE_CMP1_bm;
-                  clear_masks |= reactor::mask_of(h);
+                  clear_masks.append(h);
                } else {
                   on_timera_compare2 = h;
                   TCA().INTCTRL |= TCA_SINGLE_CMP2_bm;
-                  clear_masks |= reactor::mask_of(h);
+                  clear_masks.append(h);
                }
             };
 
@@ -136,7 +136,7 @@ namespace asx {
          static constexpr void react_on_overflow(reactor::Handle h) {
             on_timera_ovf = h;
             TCA().INTCTRL |= TCA_SINGLE_OVF_bm;
-            clear_masks |= reactor::mask_of(h);
+            clear_masks.append(h);
          }
 
          // Variadic template function to set multiple compare registers

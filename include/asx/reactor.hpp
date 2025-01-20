@@ -179,7 +179,7 @@ namespace asx {
          // Cast operator to reactor_handle_t
          operator reactor_mask_t() const {
             return mask;
-         }         
+         }
 
          /// @brief Get the highest prio handler and remove from the mask
          /// @return A matching handle object which could be reactor::null
@@ -189,15 +189,21 @@ namespace asx {
             }
 
             // Count first
-            uint8_t pos = 31 - __builtin_clz(n);
+            uint8_t pos = 31 - __builtin_clz(mask);
             reactor_handle_t retval = reinterpret_cast<reactor_handle_t>(pos);
             reactor_mask_t pop_msk = reactor_mask_of(retval);
 
             // Pop (remove mask)
             mask &= (~pop_msk);
-            
+
             // Return as object
             return Handle(retval);
+         }
+
+         /// @brief Append another reactor
+         /// @param h A reactor handle
+         void append(const Handle h) {
+            mask |= reactor_mask_of(h);
          }
       };
 
