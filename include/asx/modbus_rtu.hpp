@@ -249,6 +249,9 @@ namespace asx {
          // Create a 4xT or 2ms timer - whichever is the longest
          using Timer = asx::hw_timer::TimerA<T>;
 
+         // Keep a mask for all pending transmit requests
+         inline static auto pending_transmits = reactor::mask{0};
+
          struct StateMachine {
             // Internal SM
             auto operator()() {
@@ -360,6 +363,18 @@ namespace asx {
 
          static void on_send_complete() {
             sm.process_event(frame_sent{});
+         }
+
+         static void request_to_send(reactor::handle h ) {
+            pending_transmits.append(reactor::mask_of(h));
+
+            if ( sm.is("idle"_s)) {
+               // Grab the next item by priority
+               auto next = pending_transmits.pop();
+
+               // Invoke
+               next();
+            }
          }
       };
 
