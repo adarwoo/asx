@@ -263,6 +263,21 @@ class Matcher:
 
         self.pos = None # To be set later
 
+    def __eq__(self, other):
+        if not isinstance(other, Matcher):
+            return False  # Not comparable with non-Matcher types
+
+        # Compare class types
+        if self.__class__ != other.__class__:
+            return False
+
+        # Compare the `value` attribute
+        if self.value != other.value:
+            return False
+
+        # If all checks pass, the objects are equal
+        return True
+
     def cast(self, value):
         """Check and return the value if valid, otherwise raise an error."""
         if self.check(value):
@@ -315,6 +330,9 @@ class Range:
         self._to = to_value
     def __repr__(self):
         return f"[{self._from}-{self._to}]"
+
+    def __eq__(self, other):
+        return self._from == other._from and self._to == other._to
 
 class UnsignedMatcher(Matcher):
     """Matcher for unsigned integral types."""
@@ -424,18 +442,18 @@ class TransitionGroup:
                 retval += to_append
                 test_cnt += 1 if has_test else 0
 
-            if test_cnt:
+            if test_cnt > 0:
                 retval = data + retval + f" else {{"
 
                 if self.pos == 0:
                     retval += f"\n{tab}{extra}{INDENT}error = error_t::ignore_frame;"
-                    retval += f"\n{tab}{extra}{INDENT}state = state_t::IGNORE"
+                    retval += f"\n{tab}{extra}{INDENT}state = state_t::IGNORE;"
                 elif self.pos == 1:
                     retval += f"\n{tab}{extra}{INDENT}error = error_t::illegal_function_code;"
-                    retval += f"\n{tab}{extra}{INDENT}state = state_t::ERROR"
+                    retval += f"\n{tab}{extra}{INDENT}state = state_t::ERROR;"
                 else:
                     retval += f"\n{tab}{extra}{INDENT}error = error_t::illegal_data_value;"
-                    retval += f"\n{tab}{extra}{INDENT}state = state_t::ERROR"
+                    retval += f"\n{tab}{extra}{INDENT}state = state_t::ERROR;"
             else:
                 pass
 
@@ -443,10 +461,10 @@ class TransitionGroup:
                 return retval
         else:
             t=self.transitions[0]
-            return f"{tab}if ( cnt == {self.pos+size} ) {{\n{tab}{INDENT}state = state_t::{t.next.name}"
+            return f"{tab}if ( cnt == {self.pos+size} ) {{\n{tab}{INDENT}state = state_t::{t.next.name};"
 
         if ( test_cnt ):
-            return f"{tab}if ( cnt == {self.pos+size} ) {{\n{retval};\n{INDENT}{tab}}}"
+            return f"{tab}if ( cnt == {self.pos+size} ) {{\n{retval}\n{INDENT}{tab}}}"
 
         return f"{tab}if ( cnt == {self.pos+size} ) {{\n{retval}"
 
@@ -548,7 +566,11 @@ class State:
         for tg in transition_groups.values():
             retval += tg.to_code(indent+1)
 
-        return retval + f";\n{tab}{INDENT}}}\n{tab}{INDENT}break;\n"
+        if '{' in retval:
+            return retval + f"\n{tab}{INDENT}}}\n{tab}{INDENT}break;\n"
+
+        return retval + f"\n{tab}{INDENT}break;\n"
+
 
 class OperationState(State):
     def __init__(self, op, name, pos=0):

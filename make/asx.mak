@@ -35,6 +35,7 @@ SRCS+=\
    $(ASX_PATH)src/_ccp.s \
    $(ASX_PATH)src/sysclk.c \
    $(ASX_PATH)src/alert.c \
+	$(ASX_PATH)src/mem.c \
    $(if $(filter timer,$(ASX_USE)), $(ASX_PATH)src/timer.c, ) \
    $(if $(filter reactor,$(ASX_USE)), $(ASX_PATH)src/reactor.c, ) \
    $(if $(filter mem,$(ASX_USE)), $(ASX_PATH)src/mem.c, ) \

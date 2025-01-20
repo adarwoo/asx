@@ -95,14 +95,7 @@ namespace asx {
             static inline volatile status_code_t status; // Transfer status
 
         public:
-            static void init(const unsigned long bus_speed_hz) {
-                TWI0.MBAUD = calc_baud(bus_speed_hz);
-                TWI0.MCTRLB |= TWI_FLUSH_bm;
-                TWI0.MCTRLA = TWI_RIEN_bm | TWI_WIEN_bm | TWI_ENABLE_bm;
-                TWI0.MSTATUS = TWI_BUSSTATE_IDLE_gc;
-
-                status = status_code_t::STATUS_OK;
-            }
+            static void init(const unsigned long bus_speed_hz);
 
             /// \brief Enable Master Mode of the TWI.
             static inline void enable() {

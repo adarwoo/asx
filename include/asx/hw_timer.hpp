@@ -22,7 +22,7 @@ namespace asx {
       extern uint8_t timera_config_flag;
 
       // Single use flag
-      constexpr auto single_use = uint8_t{1<<1};
+      constexpr auto single_use = uint8_t{1U<<1};
 
       enum class mode : uint8_t {
          period,

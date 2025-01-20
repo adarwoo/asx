@@ -94,7 +94,7 @@ inline reactor_mask_t reactor_mask_of(reactor_handle_t handle) {
    uint32_t retval = 0;
 
    if ( handle != REACTOR_NULL_HANDLE ) {
-      return (1L << handle);
+      return (1UL << handle);
    }
 
    return retval;
