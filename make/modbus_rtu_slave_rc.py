@@ -669,6 +669,10 @@ class Operation:
 
         # Add the params (the list is ordered)
         return f"{self.name}({', '.join(values_str)});"
+    
+class NoOperation():
+    def to_code(self):
+        return "// Reply is ignored"
 
 class State:
     """ State in the processing of incomming bytes """
@@ -774,6 +778,12 @@ class CodeGenerator:
         # Overwrite with the configuration
         self.max_buf_size = max(self.max_buf_size, tree.get("buffer_size", 0))
 
+        # Get the type of generation
+        self.mode = tree.get("mode", "slave")
+
+        if self.mode not in ["slave", "master"]:
+            raise ParsingException("The mode must be 'master' or 'slave'")
+
         # Set the namespace
         self.namespace = tree.get("namespace", "slave")
 
@@ -817,8 +827,10 @@ class CodeGenerator:
 
             # Call the corresponding method based on the placeholder name
             return linestart + placeholders[placeholder].strip() + endl
+        
+        template = TEMPLATE_CODE_SLAVE if self.mode == "slave" else TEMPLATE_CODE_MASTER
 
-        return re.sub(r"(\s*)@(.*?)@(\n?)", replace_placeholder, TEMPLATE_CODE)
+        return re.sub(r"(\s*)@(.*?)@(\n?)", replace_placeholder, template )
 
     def get_enums_text(self, indent):
         tab = INDENT * indent
@@ -924,7 +936,10 @@ class CodeGenerator:
         """ Given a single sequence, create the states and transitions """
         pos = 1 # First byte
         callback = cmd[-1]
-        if callback not in self.callbacks:
+
+        if type(callback) is not str:
+            cmd += ("NOTHING",)
+        elif callback not in self.callbacks:
             raise ParsingException(f"Unknown callback {callback}: Callback must be declared first")
 
         for index, matcher in enumerate(cmd):
@@ -938,9 +953,6 @@ class CodeGenerator:
                 if isinstance(cmd[index+1], str): # Command to follow?
                     command_name = cmd[-1] # Grab the command name
 
-                    if command_name not in self.callbacks:
-                        raise ParsingException(f"Cmd {command_name} does not have a prototype")
-
                     # Add the CRC state
                     next_state = self.new_state(state.next("_" + command_name.upper() + "__CRC"), state.pos + matcher.size)
                     to_crc_transition = Transition(matcher, next_state)
@@ -949,7 +961,11 @@ class CodeGenerator:
                     state = next_state
 
                     # Add the final transition before making the call to the callback
-                    op = Operation(command_name, self.callbacks[command_name], [address_matcher] + list(cmd[:-1]))
+                    if command_name != "NOTHING":
+                        op = Operation(command_name, self.callbacks[command_name], [address_matcher] + list(cmd[:-1]))
+                    else:
+                        op = NoOperation()
+
                     next_state = OperationState(op, "RDY_TO_CALL__" + command_name.upper(), 0)
                     self.states.append(next_state)
                     crc_matcher = Crc(None)
