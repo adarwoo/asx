@@ -9,7 +9,6 @@
  * @{
  */
 #include <avr/wdt.h>
-#include <util/delay.h>
 
 #include <assert.h>
 #include <ioport.h>
