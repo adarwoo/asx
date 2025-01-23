@@ -156,33 +156,10 @@ namespace @NAMESPACE@ {
 
         /** Called when a T3.5 has been detected, in a good sequence */
         static void process_reply() noexcept {
-            @READY_REPLY_CALLBACK@
-
             switch(state) {
-            case state_t::IGNORE:
-                break;
-            @INCOMPLETE@
-                error = error_t::illegal_data_value;
-            case state_t::ERROR:
-                buffer[1] |= 0x80; // Mark the error
-                buffer[2] = (uint8_t)error; // Add the error code
-                cnt = 3;
-                break;
             @CALLBACKS@
             default:
                 break;
-            }
-
-            // If the cnt is 2 - nothing was changed in the buffer - return it as is
-            if ( cnt == 2 ) {
-                // Framesize includes the previous CRC which still holds valid
-                cnt = frame_size;
-            } else {
-                // Add the CRC
-                crc.reset();
-                auto _crc = crc.update(std::string_view{(char *)buffer, cnt});
-                buffer[cnt++] = _crc & 0xff;
-                buffer[cnt++] = _crc >> 8;
             }
         }
 
@@ -194,7 +171,7 @@ namespace @NAMESPACE@ {
         static void initiate_transmit(uint8_t slave_addr, asx::modbus::command_t cmd) noexcept {
             cnt = 0;
             expected_address = buffer[cnt++] = slave_addr;
-            expected_command = buffer[cnt++] = reinterpret_cast<uint8_t>(cmd);
+            expected_command = buffer[cnt++] = static_cast<uint8_t>(cmd);
         }
     }; // struct Processor
 } // namespace modbus"""
@@ -676,10 +653,11 @@ class NoOperation():
 
 class State:
     """ State in the processing of incomming bytes """
-    def __init__(self, name, pos=0):
+    def __init__(self, name, pos=0, mode="slave"):
         self.name = name
         self.transition = []
         self.pos = pos
+        self.mode = mode
 
     def add(self, transition):
         """ Append a new transition to the current state """
@@ -717,6 +695,24 @@ class State:
         transition_groups = {}
         tab = INDENT * indent
         retval = str()
+
+        if self.pos == 0 and self.mode == "master":
+            retval += f"{tab}{INDENT}".join(["",
+                "// In master mode, the first received chat must match the send request\n",
+                "if ( c != buffer[0] ) {\n",
+                "   state = state_t::ERROR;\n",
+                "   break;\n",
+                "}\n\n"]
+            )
+
+        if self.pos == 1 and self.mode == "master":
+            retval += f"{tab}{INDENT}".join(["",
+                "// In master mode, the second received chat must match the send request\n",
+                "if ( c != buffer[1] ) {\n",
+                "   state = state_t::ERROR;\n",
+                "   break;\n",
+                "}\n\n"]
+            )
 
         for transition in self.transition:
             group = transition_groups.setdefault(
@@ -803,7 +799,7 @@ class CodeGenerator:
             alt_name = new_state_name + "_" + str(count)
             count+=1
 
-        new_state = State(alt_name, pos)
+        new_state = State(alt_name, pos, self.mode)
         self.states.append(new_state)
         return new_state
 
