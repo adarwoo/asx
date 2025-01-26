@@ -143,7 +143,7 @@ namespace asx {
                handle,
                clock::to_timer_count(clock::now() + after),
                0,
-               reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(arg))
+               reinterpret_cast<void*>(static_cast<uintptr_t>(arg))
             );
          }
 
