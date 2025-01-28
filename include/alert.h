@@ -34,7 +34,7 @@ extern "C"
 /************************************************************************/
 
 /** Ready the alert stack */
-void alert_init(void);
+// Now done in init5 void alert_init(void);
 
 /** Each application must customize this function */
 void alert_record(bool abort, int line, const char *file);
@@ -52,8 +52,7 @@ void alert_record(bool abort, int line, const char *file);
  * @param cond Condition evaluated as a boolean upon which to alert
  */
 #define alert_and_stop_if(cond)               \
-   if (cond)                                  \
-   {                                          \
+   if (cond) {                                \
       alert_record(true, __LINE__, __FILE__); \
    }
 

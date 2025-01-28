@@ -27,6 +27,8 @@
  *  using #reactor_register.
  * Finally, let the reactor loose once all the interrupts are up and running with
  *  #reactor_run.
+ * To monitor the reactor, you can defined a REACTOR_BUSY debug pin. This pin is high
+ *  when the reactor calls a handler.
  * @author software@arreckx.com
  */
 

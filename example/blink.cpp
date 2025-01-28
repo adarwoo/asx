@@ -18,6 +18,6 @@ auto main() -> int {
    Pin(MY_LED).init(dir_t::out, value_t::high);
 
    using namespace std::chrono;
-   reactor::bind().repeat(1s);
+   reactor::bind(flash_led).repeat(1s);
    reactor::run();
 }

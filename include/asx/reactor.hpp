@@ -27,9 +27,6 @@ namespace asx {
       ///< Shortcut for the C++ handle
       using Handler = reactor_handler_t;
 
-      ///< Shortcut for the C++ mask
-      using mask = reactor_mask_t;
-
       ///< Null handle for C++
       constexpr auto null = reactor_handle_t{255};
 
@@ -146,7 +143,7 @@ namespace asx {
                handle,
                clock::to_timer_count(clock::now() + after),
                0,
-               reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(arg))
+               reinterpret_cast<void*>(static_cast<uintptr_t>(arg))
             );
          }
 
@@ -169,6 +166,47 @@ namespace asx {
          }
       };
 
+      ///< Shortcut for the C++ mask
+      class Mask {
+         reactor_mask_t mask;
+
+      public:         // Constructor to initialize handle
+         explicit Mask() : mask(0) {}
+
+         // Constructor to initialize handle
+         Mask(reactor_mask_t h) : mask(h) {}
+
+         // Cast operator to reactor_handle_t
+         operator reactor_mask_t() const {
+            return mask;
+         }
+
+         /// @brief Get the highest prio handler and remove from the mask
+         /// @return A matching handle object which could be reactor::null
+         Handle pop() {
+            if ( mask == 0 ) {
+               return Handle(null);
+            }
+
+            // Count first
+            uint8_t pos = 31 - __builtin_clz(mask);
+            reactor_handle_t retval = reinterpret_cast<reactor_handle_t>(pos);
+            reactor_mask_t pop_msk = reactor_mask_of(retval);
+
+            // Pop (remove mask)
+            mask &= (~pop_msk);
+
+            // Return as object
+            return Handle(retval);
+         }
+
+         /// @brief Append another reactor
+         /// @param h A reactor handle
+         void append(const Handle h) {
+            mask |= reactor_mask_of(h);
+         }
+      };
+
       template <typename Func>
       static constexpr auto bind(Func&& func, prio p = prio::low) -> Handle {
          return Handle(
@@ -180,16 +218,16 @@ namespace asx {
       }
 
       template <typename... Args>
-      static constexpr mask mask_of(Handle a, Args... args) {
-         mask m = reactor_mask_of(a);
+      static constexpr Mask mask_of(Handle a, Args... args) {
+         reactor_mask_t m = reactor_mask_of(a);
 
          // Use a fold expression to OR m with the masks of the remaining handles
          ((m |= reactor_mask_of(args)), ...);
 
-         return m;
+         return Mask(m);
       }
 
-      static inline void clear(mask m) { reactor_clear(m); }
+      static inline void clear(Mask m) { reactor_clear(m); }
 
       static inline void notify_from_isr(Handle on_xx) { reactor_null_notify_from_isr(on_xx); }
 

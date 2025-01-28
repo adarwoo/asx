@@ -13,7 +13,6 @@ ifeq ($(SWITCH_TO_DOCKER),yes)
 CURRENT_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 ASX_DIR := $(dir $(abspath $(CURRENT_MAKEFILE)/..))
 
-
 # Not in Docker, respawn inside Docker
 DOCKER_RUN_CMD := $(ASX_DIR)buildenv make
 CMD_VARS=$(strip \
@@ -134,13 +133,10 @@ $(BUILD_DIR)/%.rcd : %.json
 	$(MUTE)[ -d $(@D) ] || mkdir -p $(@D)
 	$(MUTE)$(COMPILE.rc) $@ $<
 
-%.hpp : %.conf.py
+%.hpp : %.conf.py # $(ASX_DIR)/make/modbus_rtu_slave_rc.py
 	@echo Generating $@ interface header code from $<
 	$(MUTE)[ -d $(@D) ] || mkdir -p $(@D)
-	$(MUTE)PYTHONPATH=$(TOP)/asx/make python3 $< -o$@
-
-# Add the CRC of the code to enable integrity check of the code
-# $(BUILD_DIR)/$(BIN)_crc$(BIN_EXT) : $(BUILD_DIR)/$(BIN)$(BIN_EXT)
+	$(MUTE)PYTHONPATH=$(ASX_DIR)/make python3 $< -o$@
 
 #-----------------------------------------------------------------------------
 # Create directory $$dir if it doesn't already exist.
@@ -165,5 +161,10 @@ $(BUILDDIRS) :
 #
 clean:
 	@echo Removing build directory: $(BUILD_DIR)
-	$(MUTE)rm -rf $(BUILD_DIR) $(CLEAN_FILES)
+	$(MUTE)rm -rf $(BUILD_DIR)
+	$(MUTE)EXISTING_FILES=$(shell ls $(CLEAN_FILES) 2>/dev/null); \
+	if [ -n "$$EXISTING_FILES" ]; then \
+		echo Deleting $$EXISTING_FILES; \
+		rm $$EXISTING_FILES; \
+	fi
 endif

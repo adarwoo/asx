@@ -65,8 +65,8 @@ namespace asx {
       struct t15_timeout {};
       struct t35_timeout {};
       struct t40_timeout {};
-      struct t100ms_timeout {};
-      struct request_to_send {};
+      struct reply_timeout {};
+      struct rts {};
       struct char_received { uint8_t c{}; };
       struct frame_sent {};
 
@@ -91,6 +91,185 @@ namespace asx {
 
          static auto t35() {
             return _ticks(3.5, 1750);
+         }
+      };
+
+      template<class Datagram, class Uart, class T = StaticTiming<Uart>>
+      class Master {
+         using Self = Master;
+
+         // Create a 4xT or 2ms timer - whichever is the longest
+         using Timer = asx::hw_timer::TimerA<T>;
+
+         // Keep a mask for all pending transmit requests
+         inline static auto pending_transmits = reactor::Mask{0};
+
+         // Reactor for errors
+         inline static auto react_on_error = reactor::Handle{};
+
+         // Reply timeout
+         inline static auto react_on_reply_timeout = reactor::Handle{};
+
+         // React to transmit a payload - low prio - will always run after senders
+         inline static auto react_on_transmit = reactor::Handle{};
+
+         // Store the timeout timer to cancel it
+         inline static auto timeout_timer = asx::timer::Instance{};
+
+         struct StateMachine {
+            // Internal SM
+            auto operator()() {
+               using namespace boost::sml;
+
+               auto start_timer   = [] () { Timer::start(); };
+               auto process_reply = [] () { timeout_timer.cancel(); Datagram::process_reply(); };
+               auto transmit      = [] () { Uart::send(Datagram::get_buffer()); };
+               auto timeout_error = [] () { react_on_error(); };
+
+               auto wait_for_reply= [] () {
+                  using namespace std::chrono;
+                  timeout_timer = react_on_reply_timeout.delay(10ms);
+               };
+
+               auto handle_char   = [] (const auto& event) {
+                  Timer::start(); // Restart the timers (15/35/40)
+                  Datagram::process_char(event.c);
+               };
+
+               auto insert_pending_transmit = [] {
+                  Datagram::reset();
+                  auto next = pending_transmits.pop();
+
+                  if ( next != reactor::null ) {
+                     next();
+
+                     // Also - arm the transmit on the SM which will be called AFTER since it
+                     // is a low prio (guaranteed)
+                     react_on_transmit();
+                  }
+               };
+
+               return make_transition_table(
+               * "cold"_s                + event<can_start>                     = "initial"_s
+               , "initial"_s             + on_entry<_>          / start_timer
+               , "initial"_s             + event<t35_timeout>                   = "idle"_s
+               , "initial"_s             + event<char_received> / start_timer   = "initial"_s
+               , "idle"_s                + on_entry<_>          / insert_pending_transmit
+               , "idle"_s                + event<rts>           / transmit      = "sending"_s
+               , "idle"_s                + event<char_received>                 = "initial"_s
+               , "sending"_s             + event<frame_sent>    / wait_for_reply= "waiting_for_reply"_s
+               , "waiting_for_reply"_s   + event<char_received> / handle_char   = "reception"_s
+               , "waiting_for_reply"_s   + event<reply_timeout> / timeout_error = "idle"_s
+               , "reception"_s           + event<t15_timeout>                   = "control_and_waiting"_s
+               , "reception"_s           + event<char_received> / handle_char   = "reception"_s
+               , "control_and_waiting"_s + event<t35_timeout>   / process_reply = "prevent_race"_s
+               , "prevent_race"_s        + event<t40_timeout>                   = "idle"_s
+               );
+            }
+         };
+
+#ifdef SIM
+         struct Logging {
+            template <class SM, class TEvent>
+            void log_process_event(const TEvent&) {
+               LOG_INFO("SM", "[process_event] %s", boost::sml::aux::get_type_name<TEvent>());
+            }
+
+            template <class SM, class TGuard, class TEvent>
+            void log_guard(const TGuard&, const TEvent&, bool result) {
+               LOG_INFO("SM", "[guard] %s %s %s", boost::sml::aux::get_type_name<TGuard>(),
+                     boost::sml::aux::get_type_name<TEvent>(), (result ? "[OK]" : "[Reject]"));
+            }
+
+            template <class SM, class TAction, class TEvent>
+            void log_action(const TAction&, const TEvent&) {
+               LOG_INFO("SM", "[action] %s %s", boost::sml::aux::get_type_name<TAction>(),
+                     boost::sml::aux::get_type_name<TEvent>());
+            }
+
+            template <class SM, class TSrcState, class TDstState>
+            void log_state_change(const TSrcState& src, const TDstState& dst) {
+               LOG_INFO("SM", "[transition] %s -> %s", src.c_str(), dst.c_str());
+            }
+         };
+
+         inline static Logging logger;
+         inline static auto sm = boost::sml::sm<StateMachine, boost::sml::logger<Logging>>{logger};
+
+#else
+         ///< The overall modbus state machine
+         inline static auto sm = boost::sml::sm<StateMachine>{};
+#endif
+      ///< Called to transmit the datagram buffer
+      static void on_transmit() {
+         sm.process_event(rts{});
+      }
+
+      static void on_send_complete() {
+         sm.process_event(frame_sent{});
+      }
+
+      static void on_rx_char(uint8_t c) {
+         sm.process_event(char_received{c});
+      }
+
+      static void on_reply_timeout() {
+         sm.process_event(reply_timeout{});
+      }
+
+      public:
+         static void init() {
+            Timer::init(hw_timer::single_use);
+            Uart::init();
+
+            // Set the compare for T15 and T35
+            Timer::set_compare(T::t15(), T::t35());
+
+            // Add reactor handler
+            Timer::react_on_compare(
+               reactor::bind(on_timeout_t15),
+               reactor::bind(on_timeout_t35)
+            );
+
+            Timer::react_on_overflow(reactor::bind(on_timeout_t40, reactor::low));
+
+            // Add reactor handler for the Uart
+            Uart::react_on_character_received(reactor::bind(on_rx_char));
+
+            // Add a reactor handler for when the transmit is complete
+            Uart::react_on_send_complete(reactor::bind(on_send_complete));
+
+            // React on timeout
+            react_on_reply_timeout = reactor::bind(on_reply_timeout);
+
+            // React on transmit
+            // The prio must be low so the transmit are called first
+            react_on_transmit = reactor::bind(on_transmit, reactor::prio::low);
+
+            // Start the SM
+            sm.process_event(can_start{});
+         }
+
+         static void on_timeout_t15() {
+            sm.process_event(t15_timeout{});
+         }
+
+         static void on_timeout_t35() {
+            sm.process_event(t35_timeout{});
+         }
+
+         static void on_timeout_t40() {
+            sm.process_event(t40_timeout{});
+         }
+
+         /// @brief Make a request to send a RTU frame as master. The request is added to other request
+         ///        in a reactor mask. Once the bus is available, the reactor will be called.
+         ///        If many request are pending, the highest priority reactor is served first
+         /// @param h
+         static void request_to_send(reactor::Handle h) {
+            pending_transmits.append(h);
+            pending_transmits.pop().notify();
+            react_on_transmit();
          }
       };
 
@@ -241,128 +420,5 @@ namespace asx {
             sm.process_event(frame_sent{});
          }
       };
-
-      template<class Datagram, class Uart, class T = StaticTiming<Uart>>
-      class Master {
-         using Self = Master;
-
-         // Create a 4xT or 2ms timer - whichever is the longest
-         using Timer = asx::hw_timer::TimerA<T>;
-
-         struct StateMachine {
-            // Internal SM
-            auto operator()() {
-               using namespace boost::sml;
-
-               auto start_timer = [] () { Timer::start(); };
-               auto reset       = [] () { Datagram::reset(); };
-               auto process_reply = [] () { Datagram::ready_reply(); };
-               auto transmit    = [] () { Uart::send(Datagram::get_buffer()); };
-               auto timeout_error = [](){ };
-
-               auto handle_char = [] (const auto& event) {
-                  Timer::start(); // Restart the timers (15/35/40)
-                  Datagram::process_char(event.c);
-               };
-
-               return make_transition_table(
-               * "cold"_s                + event<can_start>                         = "initial"_s
-               , "initial"_s             + on_entry<_>              / start_timer
-               , "initial"_s             + event<t35_timeout>                       = "idle"_s
-               , "initial"_s             + event<char_received>     / start_timer   = "initial"_s
-               , "idle"_s                + on_entry<_>              / reset
-               , "idle"_s                + event<request_to_send>   / transmit      = "sending"_s
-               , "idle"_s                + event<char_received>                     = "initial"_s
-               , "sending"_s             + event<frame_sent>                        = "waiting_for_reply"_s
-               , "waiting_for_reply"_s   + event<char_received>     / handle_char   = "reception"_s
-               , "waiting_for_reply"_s   + event<t100ms_timeout>    / timeout_error = "idle"_s
-               , "reception"_s           + event<t15_timeout>                       = "control_and_waiting"_s
-               , "reception"_s           + event<char_received>     / handle_char   = "reception"_s
-               , "control_and_waiting"_s + event<t35_timeout>       / process_reply = "idle"_s
-               );
-            }
-         };
-
-#ifdef SIM
-         struct Logging {
-            template <class SM, class TEvent>
-            void log_process_event(const TEvent&) {
-               LOG_INFO("SM", "[process_event] %s", boost::sml::aux::get_type_name<TEvent>());
-            }
-
-            template <class SM, class TGuard, class TEvent>
-            void log_guard(const TGuard&, const TEvent&, bool result) {
-               LOG_INFO("SM", "[guard] %s %s %s", boost::sml::aux::get_type_name<TGuard>(),
-                     boost::sml::aux::get_type_name<TEvent>(), (result ? "[OK]" : "[Reject]"));
-            }
-
-            template <class SM, class TAction, class TEvent>
-            void log_action(const TAction&, const TEvent&) {
-               LOG_INFO("SM", "[action] %s %s", boost::sml::aux::get_type_name<TAction>(),
-                     boost::sml::aux::get_type_name<TEvent>());
-            }
-
-            template <class SM, class TSrcState, class TDstState>
-            void log_state_change(const TSrcState& src, const TDstState& dst) {
-               LOG_INFO("SM", "[transition] %s -> %s", src.c_str(), dst.c_str());
-            }
-         };
-
-         inline static Logging logger;
-         inline static auto sm = boost::sml::sm<StateMachine, boost::sml::logger<Logging>>{logger};
-
-#else
-         ///< The overall modbus state machine
-         inline static auto sm = boost::sml::sm<StateMachine>{};
-#endif
-
-      public:
-         static void init() {
-            Timer::init(hw_timer::single_use);
-            Uart::init();
-
-            // Set the compare for T15 and T35
-            Timer::set_compare(T::t15(), T::t35());
-
-            // Add reactor handler
-            Timer::react_on_compare(
-               reactor::bind(on_timeout_t15),
-               reactor::bind(on_timeout_t35)
-            );
-
-            Timer::react_on_overflow(reactor::bind(on_reply_timeout));
-
-            // Add reactor handler for the Uart
-            Uart::react_on_character_received(reactor::bind(on_rx_char));
-
-            // Add a reactor handler for when the transmit is complete
-            Uart::react_on_send_complete(reactor::bind(on_send_complete));
-
-            // Start the SM
-            sm.process_event(can_start{});
-         }
-
-         static void on_rx_char(uint8_t c) {
-            sm.process_event(char_received{c});
-         }
-
-         static void on_timeout_t15() {
-            sm.process_event(t15_timeout{});
-         }
-
-         static void on_timeout_t35() {
-            sm.process_event(t35_timeout{});
-         }
-
-         static void on_reply_timeout() {
-            sm.process_event(t100ms_timeout{});
-         }
-
-         static void on_send_complete() {
-            sm.process_event(frame_sent{});
-         }
-      };
-
-
    } // namespace modbus
 } // end of namespace asx
