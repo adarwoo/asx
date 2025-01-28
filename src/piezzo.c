@@ -46,9 +46,6 @@
 #  define PIEZZO_TCB_NUMBER 0
 #endif
 
-#ifndef TIMER_TCB_NUMBER
-#  define TIMER_TCB_NUMBER 1
-#endif
 
 #if PIEZZO_TCB_NUMBER == 0
 #  define PIEZZO_TCB TCB0
@@ -56,10 +53,11 @@
 #  define PIEZZO_TCB TCB1
 #endif
 
+#ifdef TIMER_TCB_NUMBER
 #if PIEZZO_TCB_NUMBER == TIMER_TCB_NUMBER
 #  error Conflicting TIMERB allocation
 #endif
-
+#endif
 
 /** Duration of a full note at 1 beat per minutes in ms (4(full) * 60(seconds) * 1000(ms)) */
 #define TEMPO_FULL_NOTE_PERIOD 240000UL
@@ -148,13 +146,13 @@ static inline void _set_timer_compare_period(uint16_t new_tc_value)
    PIEZZO_TCB.CNT = 0;
    PIEZZO_TCB.CCMP = new_tc_value;
 
-   // Enable the compare
-   PIEZZO_TCB.CTRLB |= TCB_CCMPEN_bm;
+   // Enable the even LUT which will allow the signal to propagate
+   CCL.LUT2CTRLA |= CCL_ENABLE_bm | CCL_OUTEN_bm;
 }
 
-static inline void _stop_timer_compare(void)
-{
-   PIEZZO_TCB.CTRLB &= ~TCB_CCMPEN_bm;
+static inline void _stop_timer_compare(void) {
+   // Disable the odd LUT - which resets the D type FF and resets the output
+   CCL.LUT2CTRLA = 0;
 }
 
 /** Internal parse a single note and change all global variables */
@@ -321,27 +319,42 @@ static void _stop_tone(void *arg)
 
 void piezzo_init(void)
 {
-   // Ready the PWM
-#ifndef _WIN32
-   // Use the Timer type A to drive the piezzo transistor directly
+   // Use the Timer type A to generate the frequency
    PIEZZO_TCB.CTRLA = TCB_CLKSEL_DIV1_gc | TCB_ENABLE_bm;
    PIEZZO_TCB.CTRLB = TCB_CNTMODE_INT_gc;
 
-   // Set the WO.x as output
-   #if PIEZZO_TCB_NUMBER == 0
-      PORTA_DIRSET = _BV(5);
-   #else
-      PORTA_DIRSET = _BV(3);
-   #endif
+   // Drive the pin directly from the Timer
+   PORTB_DIRSET = _BV(3);                             // PB3 = LUT2 OUT
 
-#endif
-   // This timer does not have a PWM output when using all 16bits.
+   EVSYS.CHANNEL0 = EVSYS_CHANNEL0_TCB0_CAPT_gc;      // Channel0 feed from the timer0
+   EVSYS.USERCCLLUT2A = EVSYS_CHANNEL0_0_bm;          // Event Channel 0 to CCL LUT2 event input A
+
+   // Configure CCL
+   CCL.LUT2CTRLA = CCL_CLKSRC_IN2_gc;                 // Flip-Flop clocked by IN2
+   CCL.LUT2CTRLB = CCL_INSEL0_FEEDBACK_gc;            // Feed Flip-Flop output to IN0
+   CCL.LUT2CTRLC = CCL_INSEL2_EVENTA_gc;              // Input IN2 from timer edge
+
+   // Sequential logic 0
+   CCL.SEQCTRL1 = CCL_SEQSEL_DFF_gc;                  // Use D-type Flip-Flop
+
+   // Truth tables
+   CCL.TRUTH2 = 0b01010101;                           // Truth table for LUT2
+   CCL.TRUTH3 = 0b11111111;                           // All ones to force G at 1
+
+   // Enable the LUT and connect it to an output pin
+   CCL.LUT3CTRLA = CCL_ENABLE_bm;                     // Enable LUT3 and its output
+   CCL.LUT2CTRLA |= CCL_ENABLE_bm | CCL_OUTEN_bm;     // LUT2 enabled
+
+   CCL.CTRLA = CCL_ENABLE_bm;                         // Enable the CCL module
+
+   // Reset the timer counter
+   PIEZZO_TCB.CNT = 0;
 
    // Create the reactor handler
    react_piezzo = reactor_register(_play_next_note, PIEZZO_PRIO);
-
    react_tone_stop = reactor_register(_stop_tone, PIEZZO_PRIO);
 }
+
 
 /**
  * Play one note or a whole music sheet
