@@ -160,11 +160,15 @@ $(BUILDDIRS) :
 # Clean rules
 #
 clean:
-	@echo Removing build directory: $(BUILD_DIR)
-	$(MUTE)rm -rf $(BUILD_DIR)
-	$(MUTE)EXISTING_FILES=$(shell ls $(CLEAN_FILES) 2>/dev/null); \
-	if [ -n "$$EXISTING_FILES" ]; then \
-		echo Deleting $$EXISTING_FILES; \
-		rm $$EXISTING_FILES; \
+	$(MUTE)if [[ -d '$(BUILD_DIR)' ]]; then \
+		echo Removing build directory: $(BUILD_DIR); \
+		rm -rf $(BUILD_DIR); \
+	fi
+	$(MUTE)fl=""; for f in $(CLEAN_FILES); do [[ -f "$$f" ]] && fl+="$$f"; done; \
+	if [[ -n "$$fl" ]]; then \
+		echo Deleting $$fl; \
+		rm $$fl; \
 	fi
 endif
+
+SHELL := /bin/bash
