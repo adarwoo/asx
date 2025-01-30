@@ -40,7 +40,8 @@ The tuple is made of:
 """
 import re
 
-TEMPLATE_CODE_MASTER="""/**
+TEMPLATE_CODE_MASTER="""#pragma once
+/**
  * This file was generated to create a state machine for processing
  * uart data used for a modbus RTU.
  */
@@ -154,6 +155,10 @@ namespace @NAMESPACE@ {
             }
         }
 
+        static void pack(const asx::modbus::command_t cmd) noexcept {
+            buffer[cnt++] = static_cast<uint8_t>(cmd);
+        }
+        
         /** Called when a T3.5 has been detected, in a good sequence */
         static void process_reply() noexcept {
             switch(state) {
@@ -176,7 +181,8 @@ namespace @NAMESPACE@ {
     }; // struct Processor
 } // namespace modbus"""
 
-TEMPLATE_CODE_SLAVE="""/**
+TEMPLATE_CODE_SLAVE="""#pragma once
+/**
  * This file was generated to create a state machine for processing
  * uart data used for a modbus RTU. It should be included by
  * the modbus_rtu_slave.cpp file only which will create a full rtu slave device.
