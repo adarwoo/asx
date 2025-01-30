@@ -85,19 +85,19 @@ static void
 
 /**
  * Register a new reactor handler.
- * The handler is called once an interrupt or another reactor handler calls
- *  the notify function,
- * The priority determines which handlers are called first in a round-robin
- *  scheduler.
- * Providing the system has enough processing time, a handler should
- *  eventually be called.
- * However, low priority handler will suffer from more potential delay and
- *  jitter.
+ * 
+ * The priority determines which handlers are called first in a priority scheduler.
+ * Providing the system has enough processing time, a handler should eventually be called.
+ * However, low priority handlers are processed last, which could mean more delay and jitter.
+ * 
+ * Important: When registering high priority handlers, the first registered handler
+ *  will be served first.
+ * On the contrary, when registering low priority handlers, the first registered handler
+ *  will be served last.
+ * This can be used to create a sequencer leveraging the priorities.
  *
- * @param handler Function to call when an event is ready for processing
- * @param priority Priority of the handler during round-robin scheduling
-                   High priority handlers are handled first
- *
+ * @param handler  Function to call when an event is ready for processing
+ * @param priority Priority of the handler during scheduling. High priority handlers are handled first
  */
 reactor_handle_t reactor_register(const reactor_handler_t handler, reactor_priority_t priority)
 {
