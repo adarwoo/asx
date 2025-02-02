@@ -16,18 +16,45 @@ VPATH+=$(ASX_DIR)
 
 ASX_PATH:=$(if $(strip $(ASX_DIR)), $(addsuffix /,$(patsubst %/,%,$(filter-out $(TOP), $(ASX_DIR)))))
 
-# Manage dependencies
-ifneq ($(filter timer,$(ASX_USE)),)
-ASX_USE+=reactor
-endif
+# Will contain the list of modules after the expansion
+ASX_MODULES:=
 
-ifneq ($(filter modbus_rtu,$(ASX_USE)),)
-ASX_USE+=hw_timer reactor timer uart logger
-endif
+# Recursive function to resolve dependencies and source files
+define resolve_deps
+$(strip \
+  $(if $1, \
+    $(foreach dep,$1, \
+      $(if $(filter $(dep),$(ASX_MODULES)), \
+        , \
+        $(eval ASX_MODULES += $(dep)) \
+        $(if $(DEPOF_$(dep)), \
+          $(foreach item,$(DEPOF_$(dep)), \
+            $(if $(filter %.c %.cpp,$(item)), \
+              $(ASX_PATH)src/$(item), \
+              $(call resolve_deps,$(item)) \
+            ) \
+          ), \
+          $(error Module $(dep) is not defined in DEPOF_$(dep)) \
+        ) \
+      ) \
+    ) \
+  ) \
+)
+endef
 
-ifneq ($(filter i2c_master,$(ASX_USE)),)
-ASX_USE+=reactor timer logger
-endif
+# Define dependencies and source files for each module
+DEPOF_timer       := reactor timer.c
+DEPOF_modbus_rtu  := hw_timer reactor timer uart logger modbus_rtu.cpp
+DEPOF_pca9555     := i2c_master pca9555.cpp
+DEPOF_i2c_master  := reactor timer logger i2c_master.cpp
+DEPOF_reactor     := reactor.c
+DEPOF_hw_timer    := hw_timer.cpp
+DEPOF_uart        := uart.cpp
+DEPOF_logger      := logger
+DEPOF_piezzo      := piezzo.c
+DEPOF_eeprom      := eeprom.cpp
+
+ASX_FILES 			:= $(sort $(call resolve_deps,$(ASX_USE)))
 
 # Append ASX code files
 SRCS+=\
@@ -36,22 +63,9 @@ SRCS+=\
    $(ASX_PATH)src/sysclk.c \
    $(ASX_PATH)src/alert.c \
 	$(ASX_PATH)src/mem.c \
-   $(if $(filter timer,$(ASX_USE)), $(ASX_PATH)src/timer.c, ) \
-   $(if $(filter reactor,$(ASX_USE)), $(ASX_PATH)src/reactor.c, ) \
-   $(if $(filter mem,$(ASX_USE)), $(ASX_PATH)src/mem.c, ) \
-   $(if $(filter uart,$(ASX_USE)), $(ASX_PATH)src/uart.cpp, ) \
-   $(if $(filter modbus_rtu,$(ASX_USE)), $(ASX_PATH)src/modbus_rtu.cpp, ) \
-   $(if $(filter hw_timer,$(ASX_USE)), $(ASX_PATH)src/hw_timer.cpp, ) \
-   $(if $(filter eeprom,$(ASX_USE)), $(ASX_PATH)src/eeprom.cpp, ) \
-   $(if $(filter i2c_master,$(ASX_USE)), $(ASX_PATH)src/i2c_master.cpp, ) \
-   $(if $(filter pca9555,$(ASX_USE)), $(ASX_PATH)src/pca9555.cpp, ) \
-   $(if $(filter piezzo,$(ASX_USE)), $(ASX_PATH)src/piezzo.c, ) \
+	$(ASX_FILES)
 
-ifneq ($(filter modbus_rtu,$(ASX_USE)),)
-ASX_USE+=hw_timer reactor timer uart logger
-endif
-
-ifneq ($(filter logger,$(ASX_USE)),)
+ifneq ($(filter logger,$(ASX_MODULES)),)
 	ifdef SIM
 		SRCS+=\
 			${LOGGER_DIR}/src/logger_common.c \
