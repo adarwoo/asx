@@ -89,13 +89,24 @@ namespace asx {
             static inline Package *pkg = nullptr;
 
             /// @brief TWI Instance
-            static inline int8_t addr_count;	   // Bus transfer address data counter
-            static inline uint8_t data_count;	   // Bus transfer payload data counter
-            static inline bool read;			   // Bus transfer direction
+            static inline int8_t addr_count;	            // Bus transfer address data counter
+            static inline uint8_t data_count;	         // Bus transfer payload data counter
+            static inline bool read;			            // Bus transfer direction
             static inline volatile status_code_t status; // Transfer status
+            static inline asx::reactor::Mask requests{}; // Active requests to use the bus
+            static inline auto react_on_complete = asx::reactor::Handle{};
 
         public:
+            /// @brief Initialise the i2c master
+            /// @param bus_speed_hz Speed of the i2c bus in hz
             static void init(const unsigned long bus_speed_hz);
+
+            /// @brief Request the bus
+            /// @param requestor_handle Reactor to call when the bus is available
+            static inline void request(const asx::reactor::Handle requestor_handle) {
+               requests.append(requestor_handle);
+               check_pending();
+            }
 
             /// \brief Enable Master Mode of the TWI.
             static inline void enable() {
@@ -116,7 +127,20 @@ namespace asx {
             }
         private:
             static void write_handler();
-            static void read_handler(void);
+            static void read_handler();
+            /// @brief Check if pending request exist, and invoke it
+            static void check_pending();
+
+
+         static void on_complete(status_code_t status) {
+            // Invoke the callback
+            if ( pkg->on_complete != nullptr ) {
+               pkg->on_complete(status);
+            }
+
+            // Check for pending request
+            check_pending();
+         }
 
         public: // Evil but required for the interrupt with a C linkage
             static void interrupt_handler();

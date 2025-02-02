@@ -34,60 +34,62 @@ namespace asx {
       public:
          PCA9555(uint8_t _chip);
 
-         void read(reactor::Handle react = reactor::null);
-
-         void set_value(uint16_t value, reactor::Handle react = reactor::null) {
-            transfer(command_t::write0, value, react);
+         void read(CompleteCb cb=nullptr) {
+            read(2, command_t::read0, cb);
          }
 
-         void set_dir(uint16_t dir, reactor::Handle react = reactor::null) {
-            transfer(command_t::set_dir0, dir, react);
+         void set_value(uint16_t value, CompleteCb cb=nullptr) {
+            transfer(command_t::write0, value, cb);
          }
 
-         void set_pol(uint16_t pol, reactor::Handle react = reactor::null) {
-            transfer(command_t::set_pol0, pol, react);
+         void set_dir(uint16_t dir, CompleteCb cb=nullptr) {
+            transfer(command_t::set_dir0, dir, cb);
+         }
+
+         void set_pol(uint16_t pol, CompleteCb cb=nullptr) {
+            transfer(command_t::set_pol0, pol, cb);
          }
 
          template<unsigned PORT>
-         void read(reactor::Handle react = reactor::null) {
+         void read(CompleteCb cb=nullptr) {
             static_assert(PORT==0 or PORT==1, "Invalid port");
             if constexpr ( PORT == 0 ) {
-               read(command_t::read0, react);
+               read(1, command_t::read0, cb);
             } else {
-               read(command_t::read1, react);
+               read(1, command_t::read1, cb);
             }
          }
 
          template<unsigned PORT>
-         void set_value(uint8_t value, reactor::Handle react = reactor::null) {
+         void set_value(uint8_t value, CompleteCb cb=nullptr) {
             static_assert(PORT==0 or PORT==1, "Invalid port");
             if constexpr ( PORT == 0 ) {
-               transfer(command_t::write0, value, react);
+               transfer(command_t::write0, value, cb);
             } else {
-               transfer(command_t::write1, value, react);
+               transfer(command_t::write1, value, cb);
             }
          }
 
          template<unsigned PORT>
-         void set_dir(uint8_t dir, reactor::Handle react = reactor::null) {
+         void set_dir(uint8_t dir, CompleteCb cb=nullptr) {
             static_assert(PORT==0 or PORT==1, "Invalid port");
             if constexpr ( PORT == 0 ) {
-               transfer(command_t::set_dir0, dir, react);
+               transfer(command_t::set_dir0, dir, cb);
             } else {
-               transfer(command_t::set_dir1, dir, react);
+               transfer(command_t::set_dir1, dir, cb);
             }
          }
 
          template<unsigned PORT>
-         void set_pol(uint8_t pol, reactor::Handle react = reactor::null) {
+         void set_pol(uint8_t pol, CompleteCb cb=nullptr) {
             static_assert(PORT==0 or PORT==1, "Invalid port");
             if constexpr ( PORT == 0 ) {
-               transfer(command_t::set_pol0, pol, react);
+               transfer(command_t::set_pol0, pol, cb);
             } else {
-               transfer(command_t::set_pol1, pol, react);
+               transfer(command_t::set_pol1, pol, cb);
             }
          }
-         
+
          template <typename T>
          T get_value() {
             static_assert(std::is_same_v<T, uint8_t> || std::is_same_v<T, uint16_t>,
@@ -101,10 +103,10 @@ namespace asx {
 
       private:
          // Set a value and read
-         void transfer(command_t op, uint16_t value, reactor::Handle react);
-         void transfer(command_t op, uint8_t value, reactor::Handle react);
+         void transfer(command_t op, uint16_t value, CompleteCb cb=nullptr);
+         void transfer(command_t op, uint8_t value, CompleteCb cb=nullptr);
 
-         void read(command_t op, reactor::Handle react);
+         void read(uint8_t count, command_t op, CompleteCb cb=nullptr);
       };
    }
 }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <asx/reactor.hpp>
 
 namespace asx {
     namespace i2c {
@@ -44,6 +43,9 @@ namespace asx {
             OPERATION_IN_PROGRESS	= -128,
         };
 
+        /// @brief Callback type for when a i2c transaction has completed
+        using CompleteCb = void(*)(status_code_t);
+
         /*!
         * \brief Information concerning the data transmission
         */
@@ -59,8 +61,8 @@ namespace asx {
             uint8_t *buffer;
             //! How many bytes do we want to write.
             uint8_t length;
-            //! Callback when the operation is complete
-            asx::reactor::Handle react_on_complete;
+            //! Callback when the operation is complete. Called from the reactor.
+            CompleteCb on_complete;
         };
     } // i2c
 } // asx
