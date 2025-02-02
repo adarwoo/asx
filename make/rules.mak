@@ -99,7 +99,7 @@ LD               = $(if $(findstring .cpp,$(suffix $(SRCS))),$(LINK.cxx),$(LINK.
 # Allow the source to be in sub-directories
 BUILDDIRS        = $(sort $(dir $(OBJS)))
 
-all : $(BUILDDIRS) $(BIN)$(BIN_EXT)
+all : $(BUILDDIRS) $(BUILD_DIR)/$(BIN)$(BIN_EXT)
 
 -include $(RCDEP_FILES)
 
@@ -159,16 +159,8 @@ $(BUILDDIRS) :
 #-----------------------------------------------------------------------------
 # Clean rules
 #
-clean:
-	$(MUTE)if [[ -d '$(BUILD_DIR)' ]]; then \
-		echo Removing build directory: $(BUILD_DIR); \
-		rm -rf $(BUILD_DIR); \
-	fi
-	$(MUTE)fl=""; for f in $(CLEAN_FILES); do [[ -f "$$f" ]] && fl+="$$f"; done; \
-	if [[ -n "$$fl" ]]; then \
-		echo Deleting $$fl; \
-		rm $$fl; \
-	fi
-endif
+clean: $(BUILD_DIR)
+	@echo "Removing build directory: $(BUILD_DIR)"
+	@rm -rf $(BUILD_DIR) $(CLEAN_FILES)
 
-SHELL := /bin/bash
+endif

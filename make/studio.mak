@@ -29,5 +29,5 @@ define POST_LINK
 	$(MUTE)avr-objcopy -O ihex -R .eeprom -R .fuse -R .lock -R .signature -R .user_signatures  "$@" "${@:.elf=.hex}"
 	$(MUTE)$(SREC_CAT) $(@:.elf=.hex) -intel -crop 0 $(FLASH_END) -fill 0xFF 0 $(FLASH_END) -CRC16_Big_Endian $(FLASH_END) -broken -o $(@:.elf=_crc.hex) -intel -line-length=44
 	$(MUTE)$(SIZE) $@
-
+	$(MUTE)cp $(BUILD_DIR)/$(BIN)$(BIN_EXT) $(BIN)$(BIN_EXT)
 endef
