@@ -90,16 +90,10 @@ void reactor_run(void);
 void reactor_null_notify_from_isr(reactor_handle_t handle);
 
 /** Get the mask of a handler. The mask can be OR'd with other masks */
-inline reactor_mask_t reactor_mask_of(reactor_handle_t handle) {
-   uint32_t retval = 0;
+reactor_mask_t reactor_mask_of(reactor_handle_t handle);
 
-   if ( handle != REACTOR_NULL_HANDLE ) {
-      return (1UL << handle);
-   }
-
-   return retval;
-}
-
+/** Remove the highest prio item from the mask, and return its handle */
+reactor_handle_t reactor_mask_pop(reactor_mask_t *mask);
 
 #ifdef __cplusplus
 }

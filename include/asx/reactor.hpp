@@ -184,20 +184,7 @@ namespace asx {
          /// @brief Get the highest prio handler and remove from the mask
          /// @return A matching handle object which could be reactor::null
          Handle pop() {
-            if ( mask == 0 ) {
-               return Handle(null);
-            }
-
-            // Count first
-            uint8_t pos = 31 - __builtin_clz(mask);
-            reactor_handle_t retval = reinterpret_cast<reactor_handle_t>(pos);
-            reactor_mask_t pop_msk = reactor_mask_of(retval);
-
-            // Pop (remove mask)
-            mask &= (~pop_msk);
-
-            // Return as object
-            return Handle(retval);
+            return Handle(reactor_mask_pop(&mask));
          }
 
          /// @brief Append another reactor

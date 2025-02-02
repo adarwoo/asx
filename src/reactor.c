@@ -85,11 +85,11 @@ static void
 
 /**
  * Register a new reactor handler.
- * 
+ *
  * The priority determines which handlers are called first in a priority scheduler.
  * Providing the system has enough processing time, a handler should eventually be called.
  * However, low priority handlers are processed last, which could mean more delay and jitter.
- * 
+ *
  * Important: When registering high priority handlers, the first registered handler
  *  will be served first.
  * On the contrary, when registering low priority handlers, the first registered handler
@@ -135,6 +135,42 @@ void reactor_null_notify_from_isr(reactor_handle_t handle)
    }
 }
 
+/** Get the mask of a handler. The mask can be OR'd with other masks */
+reactor_mask_t reactor_mask_of(reactor_handle_t handle) {
+   union {
+      uint32_t integral;
+      uint8_t bytes[4];
+   } retval;
+
+   retval.integral = 0;
+
+   if ( handle != REACTOR_NULL_HANDLE ) {
+      uint8_t bit_shift = bit_shift_table[handle % 8];
+      uint8_t byte_index = handle / 8;
+      retval.bytes[byte_index] |= bit_shift;
+   }
+
+   return retval.integral;
+}
+
+/// @brief Get the highest prio handler and remove from the mask
+/// @return A matching handle object which could be reactor::null
+reactor_handle_t reactor_mask_pop(reactor_mask_t *mask) {
+   reactor_handle_t retval = REACTOR_NULL_HANDLE;
+
+   if ( *mask != 0 ) {
+      // Count first
+      uint8_t pos = __builtin_ctz(*mask);
+      reactor_handle_t retval = (reactor_handle_t)pos;
+      reactor_mask_t pop_msk = reactor_mask_of(retval);
+
+      // Pop (remove mask)
+      *mask &= (~pop_msk);
+   }
+
+   // Return as object
+   return retval;
+}
 
 /**
  * Interrupts are disabled for atomic operations
@@ -193,7 +229,7 @@ void reactor_run(void)
       else
       {
          uint8_t index;
-         
+
          // This approach sacrifices text size over speed
          if (GPIO0 != 0) {
             /**/ if (GPIO0 & 1U)  { index = 0; GPIO0 &= (~1U); }
