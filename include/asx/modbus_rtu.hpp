@@ -69,6 +69,7 @@ namespace asx {
       struct rts {};
       struct char_received { uint8_t c{}; };
       struct frame_sent {};
+      struct check_pendings {};
 
       template<class Uart>
       struct StaticTiming {
@@ -153,8 +154,9 @@ namespace asx {
                * "cold"_s                + event<can_start>                     = "initial"_s
                , "initial"_s             + on_entry<_>          / start_timer
                , "initial"_s             + event<t35_timeout>                   = "idle"_s
-               , "initial"_s             + event<char_received> / start_timer   = "initial"_s
+               , "initial"_s             + event<char_received> / start_timer
                , "idle"_s                + on_entry<_>          / insert_pending_transmit
+               , "idle"_s                + event<check_pendings>/ insert_pending_transmit
                , "idle"_s                + event<rts>           / transmit      = "sending"_s
                , "idle"_s                + event<char_received>                 = "initial"_s
                , "sending"_s             + event<frame_sent>    / wait_for_reply= "waiting_for_reply"_s
@@ -268,8 +270,7 @@ namespace asx {
          /// @param h
          static void request_to_send(reactor::Handle h) {
             pending_transmits.append(h);
-            pending_transmits.pop().notify();
-            react_on_transmit();
+            sm.process_event(check_pendings{});
          }
       };
 
