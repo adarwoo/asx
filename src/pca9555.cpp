@@ -12,34 +12,37 @@ namespace asx {
          package.buffer = buffer;
       }
 
-      void PCA9555::read(command_t op, reactor::Handle react) {
+      void PCA9555::read(uint8_t count, command_t op, CompleteCb cb) {
          package.chip = chip;
          package.addr[0] = (uint8_t)op;
          package.addr_length = 1;
-         package.length = 1; // Number of bytes to read
-         package.react_on_complete = react;
+         package.length = count; // Number of bytes to read
+         package.on_complete = cb;
+
          Master::transfer(package, true);
       }
 
       // Set a value and read
-      void PCA9555::transfer(command_t op, uint16_t value, reactor::Handle react) {
+      void PCA9555::transfer(command_t op, uint16_t value, CompleteCb cb) {
          package.chip = chip;
          package.addr[0] = (uint8_t)op;
          package.addr[1] = value >> 8;
          package.addr[2] = value & 0xff;
          package.addr_length = 3;
-         package.react_on_complete = react;
+         package.on_complete = cb;
+         package.length = 0;
 
          Master::transfer(package);
       }
 
       // Set a value and read
-      void PCA9555::transfer(command_t op, uint8_t value, reactor::Handle react) {
+      void PCA9555::transfer(command_t op, uint8_t value, CompleteCb cb) {
          package.chip = chip;
          package.addr[0] = (uint8_t)op;
          package.addr[1] = value;
          package.addr_length = 2;
-         package.react_on_complete = react;
+         package.on_complete = cb;
+         package.length = 0;
 
          Master::transfer(package);
       }
