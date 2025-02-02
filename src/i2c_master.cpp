@@ -12,6 +12,8 @@ namespace asx {
          TWI0.MCTRLA = TWI_RIEN_bm | TWI_WIEN_bm | TWI_ENABLE_bm;
          TWI0.MSTATUS = TWI_BUSSTATE_IDLE_gc;
 
+         react_on_complete = reactor::bind(on_complete);
+
          status = status_code_t::STATUS_OK;
       }
 
@@ -34,7 +36,7 @@ namespace asx {
             status = status_code_t::STATUS_OK;
 
             // Notify the reactor
-            pkg->react_on_complete(status_code_t::STATUS_OK);
+            react_on_complete(status_code_t::STATUS_OK);
          }
       }
 
@@ -61,14 +63,14 @@ namespace asx {
                TWI0.MCTRLB = TWI_ACKACT_bm | TWI_MCMD_STOP_gc;
                status = status_code_t::STATUS_OK;
 
-               pkg->react_on_complete(status_code_t::STATUS_OK);
+               react_on_complete(status_code_t::STATUS_OK);
             }
          } else {
             /* Issue STOP and buffer overflow condition. */
             TWI0.MCTRLB = TWI_MCMD_STOP_gc;
             status = status_code_t::ERR_NO_MEMORY;
 
-            pkg->react_on_complete(status_code_t::STATUS_OK);
+            react_on_complete(status_code_t::STATUS_OK);
          }
       }
 
@@ -104,12 +106,12 @@ namespace asx {
             TWI0.MCTRLB = TWI_MCMD_STOP_gc;
             status = status_code_t::ERR_BUSY;
 
-            pkg->react_on_complete(status_code_t::ERR_BUSY);
+            react_on_complete(status_code_t::ERR_BUSY);
          } else if ((master_status & TWI_BUSERR_bm) || (master_status & TWI_RXACK_bm)) {
             TWI0.MCTRLB = TWI_MCMD_STOP_gc;
             status = status_code_t::ERR_IO_ERROR;
 
-            pkg->react_on_complete(status_code_t::ERR_IO_ERROR);
+            react_on_complete(status_code_t::ERR_IO_ERROR);
          } else if (master_status & TWI_WIF_bm) {
             write_handler();
          } else if (master_status & TWI_RIF_bm) {
@@ -117,7 +119,15 @@ namespace asx {
          } else {
             status = status_code_t::ERR_PROTOCOL;
 
-            pkg->react_on_complete(status_code_t::ERR_PROTOCOL);
+            react_on_complete(status_code_t::ERR_PROTOCOL);
+         }
+      }
+
+      void Master::check_pending() {
+         // Must be idle
+         if ( is_idle() ) {
+            auto next = requests.pop();
+            next();
          }
       }
    }
