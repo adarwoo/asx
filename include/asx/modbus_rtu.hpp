@@ -4,7 +4,7 @@
 #include <cstdio>
 #endif
 
-#include <logger.h>
+#include <trace.h>
 #include <string_view>
 
 #include <boost/sml.hpp>
@@ -61,15 +61,36 @@ namespace asx {
          uint16_t update(std::string_view view);
       };
 
-      struct can_start {};
-      struct t15_timeout {};
-      struct t35_timeout {};
-      struct t40_timeout {};
-      struct reply_timeout {};
-      struct rts {};
-      struct char_received { uint8_t c{}; };
-      struct frame_sent {};
-      struct check_pendings {};
+      struct can_start {
+         constexpr const char *c_str() const  { return "can_start"; }
+      };
+
+      struct t15_timeout {
+         constexpr const char *c_str() const { return "t15_timeout"; }
+      };
+      struct t35_timeout {
+         constexpr const char *c_str() const { return "t35_timeout"; }
+      };
+      struct t40_timeout {
+         constexpr const char *c_str() const { return "t40_timeout"; }
+      };
+      struct reply_timeout {
+         constexpr const char *c_str() const { return "reply_timeout"; }
+      };
+      struct rts  {
+         constexpr const char *c_str() const { return "rts"; }
+      };
+      struct char_received {
+          uint8_t c{};
+         constexpr const char *c_str() const { return "char_received"; }
+      };
+      struct frame_sent  {
+         constexpr const char *c_str() const { return "frame_sent"; }
+      };
+      struct check_pendings {
+         constexpr const char *c_str() const { return "check_pendings"; }
+      };
+
 
       template<class Uart>
       struct StaticTiming {
@@ -94,6 +115,30 @@ namespace asx {
             return _ticks(3.5, 1750);
          }
       };
+
+
+      struct Logging {
+         template <class SM, class TEvent>
+         void log_process_event(const TEvent& evt) {
+            trace("[evt] %s", (char*)evt.c_str());
+         }
+
+         template <class SM, class TGuard, class TEvent>
+         void log_guard(const TGuard&, const TEvent&, bool result) {
+            trace("[grd]");
+         }
+
+         template <class SM, class TAction, class TEvent>
+         void log_action(const TAction& act, const TEvent& evt) {
+            trace("[act]");
+         }
+
+         template <class SM, class TSrcState, class TDstState>
+         void log_state_change(const TSrcState& src, const TDstState& dst) {
+            trace("[>] %s -> %s", src.c_str(), dst.c_str());
+         }
+      };
+
 
       template<class Datagram, class Uart, class T = StaticTiming<Uart>>
       class Master {
@@ -139,10 +184,11 @@ namespace asx {
 
                auto insert_pending_transmit = [] {
                   Datagram::reset();
+
                   auto next = pending_transmits.pop();
 
                   if ( next != reactor::null ) {
-                     next();
+                     reactor_notify(next, nullptr);
 
                      // Also - arm the transmit on the SM which will be called AFTER since it
                      // is a low prio (guaranteed)
@@ -170,38 +216,15 @@ namespace asx {
             }
          };
 
-#ifdef SIM
-         struct Logging {
-            template <class SM, class TEvent>
-            void log_process_event(const TEvent&) {
-               LOG_INFO("SM", "[process_event] %s", boost::sml::aux::get_type_name<TEvent>());
-            }
 
-            template <class SM, class TGuard, class TEvent>
-            void log_guard(const TGuard&, const TEvent&, bool result) {
-               LOG_INFO("SM", "[guard] %s %s %s", boost::sml::aux::get_type_name<TGuard>(),
-                     boost::sml::aux::get_type_name<TEvent>(), (result ? "[OK]" : "[Reject]"));
-            }
-
-            template <class SM, class TAction, class TEvent>
-            void log_action(const TAction&, const TEvent&) {
-               LOG_INFO("SM", "[action] %s %s", boost::sml::aux::get_type_name<TAction>(),
-                     boost::sml::aux::get_type_name<TEvent>());
-            }
-
-            template <class SM, class TSrcState, class TDstState>
-            void log_state_change(const TSrcState& src, const TDstState& dst) {
-               LOG_INFO("SM", "[transition] %s -> %s", src.c_str(), dst.c_str());
-            }
-         };
-
+#ifdef DEBUG
          inline static Logging logger;
          inline static auto sm = boost::sml::sm<StateMachine, boost::sml::logger<Logging>>{logger};
-
 #else
          ///< The overall modbus state machine
          inline static auto sm = boost::sml::sm<StateMachine>{};
-#endif
+#endif // DEBUG
+
       ///< Called to transmit the datagram buffer
       static void on_transmit() {
          sm.process_event(rts{});
@@ -270,6 +293,7 @@ namespace asx {
          /// @param h
          static void request_to_send(reactor::Handle h) {
             pending_transmits.append(h);
+            trace("Pend %x", static_cast<uint32_t>(pending_transmits));
             sm.process_event(check_pendings{});
          }
       };
@@ -286,13 +310,13 @@ namespace asx {
 
             switch ( Datagram::get_status() ) {
                case Datagram::status_t::NOT_FOR_ME:
-                  LOG_INFO("DGRAM", "Frame is not for me");
+                  trace("Frame is not for me");
                   break;
                case Datagram::status_t::BAD_CRC:
-                  LOG_WARN("DGRAM", "Bad CRC");
+                  trace("Bad CRC");
                   break;
                case Datagram::status_t::GOOD_FRAME:
-                  LOG_WARN("DGRAM", "Good Frame received");
+                  trace("Good Frame received");
                   return true;
                default:
                   break;
@@ -343,33 +367,8 @@ namespace asx {
          };
 
 #ifdef SIM
-         struct Logging {
-            template <class SM, class TEvent>
-            void log_process_event(const TEvent&) {
-               LOG_INFO("SM", "[process_event] %s", boost::sml::aux::get_type_name<TEvent>());
-            }
-
-            template <class SM, class TGuard, class TEvent>
-            void log_guard(const TGuard&, const TEvent&, bool result) {
-               LOG_INFO("SM", "[guard] %s %s %s", boost::sml::aux::get_type_name<TGuard>(),
-                     boost::sml::aux::get_type_name<TEvent>(), (result ? "[OK]" : "[Reject]"));
-            }
-
-            template <class SM, class TAction, class TEvent>
-            void log_action(const TAction&, const TEvent&) {
-               LOG_INFO("SM", "[action] %s %s", boost::sml::aux::get_type_name<TAction>(),
-                     boost::sml::aux::get_type_name<TEvent>());
-            }
-
-            template <class SM, class TSrcState, class TDstState>
-            void log_state_change(const TSrcState& src, const TDstState& dst) {
-               LOG_INFO("SM", "[transition] %s -> %s", src.c_str(), dst.c_str());
-            }
-         };
-
          inline static Logging logger;
          inline static auto sm = boost::sml::sm<StateMachine, boost::sml::logger<Logging>>{logger};
-
 #else
          ///< The overall modbus state machine
          inline static auto sm = boost::sml::sm<StateMachine>{};

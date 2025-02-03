@@ -45,8 +45,8 @@ TEMPLATE_CODE_MASTER="""#pragma once
  * This file was generated to create a state machine for processing
  * uart data used for a modbus RTU.
  */
-#include <logger.h>
 #include <stdint.h>
+#include <trace.h>
 #include <asx/modbus_rtu.hpp>
 
 namespace @NAMESPACE@ {
@@ -106,7 +106,7 @@ namespace @NAMESPACE@ {
             error = error_t::ok;
             state = state_t::DEVICE_ADDRESS;
         }
-        
+
         static status_t get_status() noexcept {
             if (state == state_t::IGNORE) {
                 return status_t::NOT_FOR_ME;
@@ -116,7 +116,7 @@ namespace @NAMESPACE@ {
         }
 
         static void process_char(const uint8_t c) noexcept {
-            LOG_TRACE("DGRAM", "Char: 0x%.2x, index: %d, state: %d", c, cnt, (uint8_t)state);
+            trace("Char: 0x%.2x, index: %d, state: %d", c, cnt, (uint8_t)state);
 
             if (state == state_t::IGNORE) {
                 return;
@@ -158,7 +158,7 @@ namespace @NAMESPACE@ {
         static void pack(const asx::modbus::command_t cmd) noexcept {
             buffer[cnt++] = static_cast<uint8_t>(cmd);
         }
-        
+
         /** Called when a T3.5 has been detected, in a good sequence */
         static void process_reply() noexcept {
             switch(state) {
@@ -187,8 +187,8 @@ TEMPLATE_CODE_SLAVE="""#pragma once
  * uart data used for a modbus RTU. It should be included by
  * the modbus_rtu_slave.cpp file only which will create a full rtu slave device.
  */
-#include <logger.h>
 #include <stdint.h>
+#include <trace.h>
 #include <asx/modbus_rtu.hpp>
 
 namespace @NAMESPACE@ {
@@ -254,7 +254,7 @@ namespace @NAMESPACE@ {
         }
 
         static void process_char(const uint8_t c) noexcept {
-            LOG_TRACE("DGRAM", "Char: 0x%.2x, index: %d, state: %d", c, cnt, (uint8_t)state);
+            trace("Char: 0x%.2x, index: %d, state: %d", c, cnt, (uint8_t)state);
 
             if (state == state_t::IGNORE) {
                 return;
@@ -652,7 +652,7 @@ class Operation:
 
         # Add the params (the list is ordered)
         return f"{self.name}({', '.join(values_str)});"
-    
+
 class NoOperation():
     def to_code(self):
         return "// Reply is ignored"
@@ -829,7 +829,7 @@ class CodeGenerator:
 
             # Call the corresponding method based on the placeholder name
             return linestart + placeholders[placeholder].strip() + endl
-        
+
         template = TEMPLATE_CODE_SLAVE if self.mode == "slave" else TEMPLATE_CODE_MASTER
 
         return re.sub(r"(\s*)@(.*?)@(\n?)", replace_placeholder, template )
