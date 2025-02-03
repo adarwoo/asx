@@ -219,7 +219,7 @@ namespace asx {
                   buffer[0] = '\0';
                }
 
-               LOG_INFO("UART", "%s", buffer);
+               trace("%s", buffer);
             #endif
          }
 
