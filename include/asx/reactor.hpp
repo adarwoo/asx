@@ -13,8 +13,9 @@
  * Additional timer service is added to the reactors
  * @author software@arreckx.com
  */
-#include "reactor.h"
-#include "asx/timer.hpp"
+#include <reactor.h>
+#include <asx/timer.hpp>
+#include <trace.h>
 
 namespace asx {
    namespace reactor
@@ -41,13 +42,10 @@ namespace asx {
          // Constructor to initialize handle
          Handle(reactor_handle_t h) : handle(h) {}
 
+         Handle(const Handle& h) = default;
+
          // Assignment operator from another Handle
-         Handle& operator=(const Handle& other) {
-            if (this != &other) {
-                  handle = other.handle;
-            }
-            return *this;
-         }
+         Handle& operator=(const Handle& other) = default;
 
          // Assignment operator from reactor_handle_t
          Handle& operator=(reactor_handle_t h) {
