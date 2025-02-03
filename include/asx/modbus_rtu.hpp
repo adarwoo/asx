@@ -156,9 +156,6 @@ namespace asx {
          // Reply timeout
          inline static auto react_on_reply_timeout = reactor::Handle{};
 
-         // React to transmit a payload - low prio - will always run after senders
-         inline static auto react_on_transmit = reactor::Handle{};
-
          // Store the timeout timer to cancel it
          inline static auto timeout_timer = asx::timer::Instance{};
 
@@ -183,16 +180,13 @@ namespace asx {
                };
 
                auto insert_pending_transmit = [] {
-                  Datagram::reset();
-
                   auto next = pending_transmits.pop();
 
                   if ( next != reactor::null ) {
-                     reactor_notify(next, nullptr);
+                     Datagram::reset();
 
-                     // Also - arm the transmit on the SM which will be called AFTER since it
-                     // is a low prio (guaranteed)
-                     react_on_transmit();
+                     next.invoke(); // Call directly
+                     process(rts{});
                   }
                };
 
@@ -227,7 +221,7 @@ namespace asx {
 
       ///< Called to transmit the datagram buffer
       static void on_transmit() {
-         sm.process_event(rts{});
+
       }
 
       static void on_send_complete() {
@@ -267,10 +261,6 @@ namespace asx {
             // React on timeout
             react_on_reply_timeout = reactor::bind(on_reply_timeout);
 
-            // React on transmit
-            // The prio must be low so the transmit are called first
-            react_on_transmit = reactor::bind(on_transmit, reactor::prio::low);
-
             // Start the SM
             sm.process_event(can_start{});
          }
@@ -293,7 +283,6 @@ namespace asx {
          /// @param h
          static void request_to_send(reactor::Handle h) {
             pending_transmits.append(h);
-            trace("Pend %x", static_cast<uint32_t>(pending_transmits));
             sm.process_event(check_pendings{});
          }
       };
