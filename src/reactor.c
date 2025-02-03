@@ -137,20 +137,17 @@ void reactor_null_notify_from_isr(reactor_handle_t handle)
 
 /** Get the mask of a handler. The mask can be OR'd with other masks */
 reactor_mask_t reactor_mask_of(reactor_handle_t handle) {
-   union {
-      uint32_t integral;
-      uint8_t bytes[4];
-   } retval;
+   uint32_t integral;
 
-   retval.integral = 0;
+   integral = 0;
 
    if ( handle != REACTOR_NULL_HANDLE ) {
       uint8_t bit_shift = bit_shift_table[handle % 8];
       uint8_t byte_index = handle / 8;
-      retval.bytes[byte_index] |= bit_shift;
+      ((uint8_t*)&integral)[byte_index] = bit_shift;
    }
 
-   return retval.integral;
+   return integral;
 }
 
 /// @brief Get the highest prio handler and remove from the mask
@@ -161,7 +158,7 @@ reactor_handle_t reactor_mask_pop(reactor_mask_t *mask) {
    if ( *mask != 0 ) {
       // Count first
       uint8_t pos = __builtin_ctz(*mask);
-      reactor_handle_t retval = (reactor_handle_t)pos;
+      retval = (reactor_handle_t)pos;
       reactor_mask_t pop_msk = reactor_mask_of(retval);
 
       // Pop (remove mask)
