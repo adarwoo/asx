@@ -95,6 +95,10 @@ reactor_mask_t reactor_mask_of(reactor_handle_t handle);
 /** Remove the highest prio item from the mask, and return its handle */
 reactor_handle_t reactor_mask_pop(reactor_mask_t *mask);
 
+/** Call a handler directly */
+void reactor_invoke( reactor_handle_t handle, void *data );
+
+
 #ifdef __cplusplus
 }
 #endif

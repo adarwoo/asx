@@ -187,6 +187,20 @@ void reactor_notify( reactor_handle_t handle, void *data )
 }
 
 /**
+ * Call the handler directly
+ * Never call from an interrupt
+ * This function is meant to be used with masks
+ */
+void reactor_invoke( reactor_handle_t handle, void *data )
+{
+   if ( handle != REACTOR_NULL_HANDLE )
+   {
+      _handlers[handle].handler(data);
+   }
+}
+
+
+/**
  * Clear pending operations. This should be called in a critical section to prevent races.
  * @param handle Handle to clear.
  * @param ... More handles are accepted
