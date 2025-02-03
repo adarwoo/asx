@@ -53,6 +53,7 @@ DEPOF_uart        := uart.cpp
 DEPOF_logger      := logger
 DEPOF_piezzo      := piezzo.c
 DEPOF_eeprom      := eeprom.cpp
+DEPOF_trace       := timer trace.c
 
 ASX_FILES 			:= $(sort $(call resolve_deps,$(ASX_USE)))
 
