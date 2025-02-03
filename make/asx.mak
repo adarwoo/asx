@@ -44,7 +44,7 @@ endef
 
 # Define dependencies and source files for each module
 DEPOF_timer       := reactor timer.c
-DEPOF_modbus_rtu  := hw_timer reactor timer uart logger modbus_rtu.cpp
+DEPOF_modbus_rtu  := hw_timer reactor timer uart logger modbus_rtu.cpp trace
 DEPOF_pca9555     := i2c_master pca9555.cpp
 DEPOF_i2c_master  := reactor timer logger i2c_master.cpp
 DEPOF_reactor     := reactor.c
