@@ -14,8 +14,9 @@
  * @author software@arreckx.com
  */
 #include <reactor.h>
-#include <asx/timer.hpp>
 #include <trace.h>
+
+#include <asx/timer.hpp>
 
 namespace asx {
    namespace reactor
@@ -209,13 +210,23 @@ namespace asx {
          void append(const Handle h) {
             mask |= reactor_mask_of(h);
          }
+
+         /// @brief Append another reactor
+         /// @param h A reactor handle
+         void append(const Mask m) {
+            mask |= m.mask;
+         }
       };
 
       template <typename Func>
-      static constexpr auto bind(Func&& func, prio p = prio::low) -> Handle {
+      static constexpr auto bind(Func func, prio p = prio::low) -> Handle {
+         // Convert the func to a void(void)
+         using vv = void(*)();
+         auto pv = (vv)func;
+
          return Handle(
             reactor_register(
-               reinterpret_cast<Handler>(func),
+               (reactor_handler_t)(pv),
                (reactor_priority_t)p
             )
          );
