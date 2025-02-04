@@ -66,29 +66,29 @@ namespace asx {
       };
 
       struct t15_timeout {
-         constexpr const char *c_str() const { return "t15_timeout"; }
+         constexpr const char *c_str() const { return "t15_to"; }
       };
       struct t35_timeout {
-         constexpr const char *c_str() const { return "t35_timeout"; }
+         constexpr const char *c_str() const { return "t35_to"; }
       };
       struct t40_timeout {
-         constexpr const char *c_str() const { return "t40_timeout"; }
+         constexpr const char *c_str() const { return "t40_to"; }
       };
       struct reply_timeout {
-         constexpr const char *c_str() const { return "reply_timeout"; }
+         constexpr const char *c_str() const { return "reply_to"; }
       };
       struct rts  {
          constexpr const char *c_str() const { return "rts"; }
       };
       struct char_received {
           uint8_t c{};
-         constexpr const char *c_str() const { return "char_received"; }
+         constexpr const char *c_str() const { return "char_rxd"; }
       };
       struct frame_sent  {
          constexpr const char *c_str() const { return "frame_sent"; }
       };
       struct check_pendings {
-         constexpr const char *c_str() const { return "check_pendings"; }
+         constexpr const char *c_str() const { return "check_pend"; }
       };
 
 
@@ -156,6 +156,10 @@ namespace asx {
          // Reply timeout
          inline static auto react_on_reply_timeout = reactor::Handle{};
 
+         // Initiate a transmit
+         inline static auto react_on_ready_to_send = reactor::Handle{};
+
+
          // Store the timeout timer to cancel it
          inline static auto timeout_timer = asx::timer::Instance{};
 
@@ -164,12 +168,11 @@ namespace asx {
             auto operator()() {
                using namespace boost::sml;
 
-               auto start_timer   = [] () { Timer::start(); };
-               auto process_reply = [] () { timeout_timer.cancel(); Datagram::process_reply(); };
-               auto transmit      = [] () { Uart::send(Datagram::get_buffer()); };
-               auto timeout_error = [] () { react_on_error(); };
+               auto start_timer   = [] { Timer::start(); };
+               auto process_reply = [] { timeout_timer.cancel(); Datagram::process_reply(); };
+               auto timeout_error = [] { react_on_error(); };
 
-               auto wait_for_reply= [] () {
+               auto wait_for_reply= [] {
                   using namespace std::chrono;
                   timeout_timer = react_on_reply_timeout.delay(10ms);
                };
@@ -186,7 +189,9 @@ namespace asx {
                      Datagram::reset();
 
                      next.invoke(); // Call directly
-                     process(rts{});
+
+                     // Get the SM to move to RTS as we cannot transition from within an action
+                     react_on_ready_to_send();
                   }
                };
 
@@ -197,7 +202,7 @@ namespace asx {
                , "initial"_s             + event<char_received> / start_timer
                , "idle"_s                + on_entry<_>          / insert_pending_transmit
                , "idle"_s                + event<check_pendings>/ insert_pending_transmit
-               , "idle"_s                + event<rts>           / transmit      = "sending"_s
+               , "idle"_s                + event<rts>                           = "sending"_s
                , "idle"_s                + event<char_received>                 = "initial"_s
                , "sending"_s             + event<frame_sent>    / wait_for_reply= "waiting_for_reply"_s
                , "waiting_for_reply"_s   + event<char_received> / handle_char   = "reception"_s
@@ -210,19 +215,13 @@ namespace asx {
             }
          };
 
-
 #ifdef DEBUG
          inline static Logging logger;
-         inline static auto sm = boost::sml::sm<StateMachine, boost::sml::logger<Logging>>{logger};
+         inline static boost::sml::sm<StateMachine, boost::sml::logger<Logging>> sm{logger};
 #else
          ///< The overall modbus state machine
          inline static auto sm = boost::sml::sm<StateMachine>{};
 #endif // DEBUG
-
-      ///< Called to transmit the datagram buffer
-      static void on_transmit() {
-
-      }
 
       static void on_send_complete() {
          sm.process_event(frame_sent{});
@@ -234,6 +233,11 @@ namespace asx {
 
       static void on_reply_timeout() {
          sm.process_event(reply_timeout{});
+      }
+
+      static void on_ready_to_send() {
+         Uart::send(Datagram::get_buffer());
+         sm.process_event(rts{});
       }
 
       public:
@@ -250,6 +254,7 @@ namespace asx {
                reactor::bind(on_timeout_t35)
             );
 
+            // Add reactor handler for the big timeout
             Timer::react_on_overflow(reactor::bind(on_timeout_t40, reactor::low));
 
             // Add reactor handler for the Uart
@@ -257,6 +262,9 @@ namespace asx {
 
             // Add a reactor handler for when the transmit is complete
             Uart::react_on_send_complete(reactor::bind(on_send_complete));
+
+            // Add a reactor to intiate the transmittion
+            react_on_ready_to_send = reactor::bind(on_ready_to_send);
 
             // React on timeout
             react_on_reply_timeout = reactor::bind(on_reply_timeout);
