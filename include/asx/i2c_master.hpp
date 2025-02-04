@@ -102,9 +102,18 @@ namespace asx {
             static void init(const unsigned long bus_speed_hz);
 
             /// @brief Request the bus
-            /// @param requestor_handle Reactor to call when the bus is available
+            /// The highest prio handle is called first
+            /// @param requestor_handle Reactor handle to call when the bus is available
             static inline void request(const asx::reactor::Handle requestor_handle) {
                requests.append(requestor_handle);
+               check_pending();
+            }
+
+            /// @brief Request the bus
+            /// The highest prio handle is called first
+            /// @param mask Pass the mask
+            static inline void request(const asx::reactor::Mask handles) {
+               requests.append(handles);
                check_pending();
             }
 
