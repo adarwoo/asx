@@ -16,7 +16,6 @@ SPEC_PATH = ${PACK_PATH}/gcc/dev/$(ARCH)
 BIN_EXT :=.elf
 
 # Remove all logs
-CPPFLAGS += -DFORCE_NODEBUG
 ARCHFLAGS :=-mmcu=$(ARCH) -B $(SPEC_PATH) -isystem $(PACK_PATH)/include
 CFLAGS += -funsigned-char -funsigned-bitfields -ffunction-sections -fdata-sections -fshort-enums $(ARCHFLAGS)
 CFLAGS += -O$(if $(NDEBUG),s,g)

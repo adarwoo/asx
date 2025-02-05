@@ -1,7 +1,7 @@
-#ifdef DEBUG
 #include <trace.h>
-#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
 
@@ -19,9 +19,20 @@
 
 #define MAX_MESSAGE_SIZE 32 // Max size of a single trace message
 
+#define TRACE_END_CHAR '<'
+
 char trace_buffer[LOGGER_BUFFER_SIZE];
 static uint16_t loggerIndex = 0;
 static timer_count_t lastTimerCount = 0; // Store the last timer count for elapsed time calculation
+
+static void
+#ifndef _WIN32
+   __attribute__ ((section (".init5"), naked, used))
+#endif
+trace_init( void )
+{
+   memset(trace_buffer, TRACE_END_CHAR, LOGGER_BUFFER_SIZE);
+}
 
 void trace(const char *format, ...) {
    // Constants for the format
@@ -58,7 +69,6 @@ void trace(const char *format, ...) {
 
    // Write the padding '<' characters only after the most recent message
    for (uint16_t i = 0; i < MAX_MESSAGE_SIZE; i++) {
-      trace_buffer[loggerIndex + i] = '<';
+      trace_buffer[loggerIndex + i] = TRACE_END_CHAR;
    }
 }
-#endif // def DEBUG

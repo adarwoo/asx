@@ -1,7 +1,7 @@
-#include "board.h"
 #include <avr/interrupt.h>
 #include <asx/i2c_master.hpp>
 #include <alert.h>
+#include "board.h"
 
 
 namespace asx {

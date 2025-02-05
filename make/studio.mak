@@ -13,7 +13,7 @@ MUTE  := $(if $(VERBOSE),,@)
 BIN_EXT :=.elf
 
 ARCHFLAGS :=-mmcu=$(ARCH) -B "$(DEVICE_STARTUP_ROOT)\gcc\dev\$(ARCH)"
-CPPFLAGS += -isystem "$(DEVICE_STARTUP_ROOT)/include" -DFORCE_NODEBUG
+CPPFLAGS += -isystem "$(DEVICE_STARTUP_ROOT)/include"
 CFLAGS += -funsigned-char -funsigned-bitfields -ffunction-sections -fdata-sections -fshort-enums
 CFLAGS += -O$(if $(NDEBUG),s,g)
 CXXFLAGS += -fno-threadsafe-statics
