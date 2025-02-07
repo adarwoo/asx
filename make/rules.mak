@@ -13,11 +13,14 @@ ifeq ($(SWITCH_TO_DOCKER),yes)
 CURRENT_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 ASX_DIR := $(dir $(abspath $(CURRENT_MAKEFILE)/..))
 
+# Define a space and non-breakable space
+space := $(empty) $(empty)
+
 # Not in Docker, respawn inside Docker
 DOCKER_RUN_CMD := $(ASX_DIR)buildenv make
 CMD_VARS=$(strip \
-	$(foreach var, $(.VARIABLES), $(if $(filter command line, $(origin $(var))), $(var)=$($(var)))))
-
+	$(foreach var,$(.VARIABLES), $(if $(filter command line, $(origin $(var))),$(var)=$($(var)))))
+	
 all $(filter-out all, $(MAKECMDGOALS)):
 	@$(DOCKER_RUN_CMD) $@ $(CMD_VARS)
 else
@@ -99,6 +102,39 @@ LD               = $(if $(findstring .cpp,$(suffix $(SRCS))),$(LINK.cxx),$(LINK.
 # Allow the source to be in sub-directories
 BUILDDIRS        = $(sort $(dir $(OBJS)))
 
+# Manage the tracing flags
+# Argument to pass are trace=info dom="uart patch"
+# Default values for trace level and domains
+trace ?= WARN
+dom ?= ""
+
+# Convert trace level to uppercase
+TRACE_LEVEL_UPPER := $(shell echo $(trace) | tr a-z A-Z)
+
+# Map trace level to numeric values
+ifeq ($(TRACE_LEVEL_UPPER), ERROR)
+    TRACE_LEVEL_NUM := 0
+else ifeq ($(TRACE_LEVEL_UPPER), WARN)
+    TRACE_LEVEL_NUM := 1
+else ifeq ($(TRACE_LEVEL_UPPER), MILE)
+    TRACE_LEVEL_NUM := 2
+else ifeq ($(TRACE_LEVEL_UPPER), TRACE)
+    TRACE_LEVEL_NUM := 3
+else ifeq ($(TRACE_LEVEL_UPPER), INFO)
+    TRACE_LEVEL_NUM := 4
+else ifeq ($(TRACE_LEVEL_UPPER), DEBUG)
+    TRACE_LEVEL_NUM := 5
+else
+    $(error Invalid trace level: $(TRACE_LEVEL))
+endif
+
+# Convert domains to uppercase and add -D flags
+DOMAINS_UPPER := $(shell echo $(dom) | tr a-z A-Z | tr ',' ' ')
+DOMAIN_FLAGS := $(foreach domain, $(DOMAINS_UPPER), -DDOMAIN_$(domain)_ENABLED=1)
+
+# Add trace level and domain flags to CPPFLAGS
+CPPFLAGS += -DTRACE_LEVEL=$(TRACE_LEVEL_NUM) $(DOMAIN_FLAGS)
+
 all : $(BUILDDIRS) $(BUILD_DIR)/$(BIN)$(BIN_EXT)
 
 -include $(RCDEP_FILES)
@@ -133,7 +169,7 @@ $(BUILD_DIR)/%.rcd : %.json
 	$(MUTE)[ -d $(@D) ] || mkdir -p $(@D)
 	$(MUTE)$(COMPILE.rc) $@ $<
 
-%.hpp : %.conf.py # $(ASX_DIR)/make/modbus_rtu_slave_rc.py
+%.hpp : %.conf.py $(ASX_DIR)/make/modbus_rtu_slave_rc.py
 	@echo Generating $@ interface header code from $<
 	$(MUTE)[ -d $(@D) ] || mkdir -p $(@D)
 	$(MUTE)PYTHONPATH=$(ASX_DIR)/make python3 $< -o$@
@@ -163,4 +199,10 @@ clean: $(BUILD_DIR)
 	@echo "Removing build directory: $(BUILD_DIR)"
 	@rm -rf $(BUILD_DIR) $(CLEAN_FILES)
 
-endif
+help:
+	@echo "Rules are: all, clean"
+	@echo "Trace: Set the variable trace={error,warn,mile,info,debug} and dom={<dom0>,<dom1>...}"
+
+endif # SWITCH_TO_DOCKER
+
+

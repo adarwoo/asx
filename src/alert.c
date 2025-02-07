@@ -16,6 +16,7 @@
 // Need to include the configuration to determine the alert pin
 #include <board.h>
 #include <alert.h>
+#include <trace.h>
 
 #ifdef ALERT_RECORD
 #   ifndef ALERT_RECORD_OFFSET
@@ -26,7 +27,6 @@
 /**
  * We need to initialize the alert API
  * For LED notification, we need to set the LED direction.
- * For EEPROM storage, we need to ready some variables
  */
 static void
 #ifndef _WIN32
@@ -52,6 +52,9 @@ alert_init( void )
 void alert_record( bool doAbort, int line, const char *file )
 {
    cli();
+
+   // Write the alert in the trace
+   trace("***ALERT***: %u %s", line, file);
 
    // Dump to the debug pin
    #ifdef ALERT_OUTPUT_PIN
