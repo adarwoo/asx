@@ -123,11 +123,13 @@ namespace asx {
          }
       }
 
+      /// @brief Check for pending requests
+      /// Calls the handler directly
       void Master::check_pending() {
          // Must be idle
          if ( is_idle() ) {
             auto next = requests.pop();
-            next();
+            next.invoke();
          }
       }
    }
