@@ -1,4 +1,4 @@
-.PHONY: clean all
+.PHONY: clean all shell
 
 # Check if running inside Docker
 SWITCH_TO_DOCKER:=$(shell test -f /.dockerenv && echo no || echo yes)
@@ -21,8 +21,11 @@ DOCKER_RUN_CMD := $(ASX_DIR)buildenv make
 CMD_VARS=$(strip \
 	$(foreach var,$(.VARIABLES), $(if $(filter command line, $(origin $(var))),$(var)=$($(var)))))
 	
-all $(filter-out all, $(MAKECMDGOALS)):
+all $(filter-out all shell, $(MAKECMDGOALS)):
 	@$(DOCKER_RUN_CMD) $@ $(CMD_VARS)
+
+shell:
+	@$(ASX_DIR)/buildenv
 else
 
 # By default, build for the AVR target. Export sim to build a simulator
@@ -204,5 +207,3 @@ help:
 	@echo "Trace: Set the variable trace={error,warn,mile,info,debug} and dom={<dom0>,<dom1>...}"
 
 endif # SWITCH_TO_DOCKER
-
-
