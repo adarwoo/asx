@@ -55,12 +55,22 @@ void trace(const char *format, ...) {
    trace_buffer[loggerIndex++] = ']';
    va_list args;
    va_start(args, format);
-   memset(&trace_buffer[loggerIndex], ' ', maxTextLen);
-   vsnprintf(&trace_buffer[loggerIndex], maxTextLen, format, args);
+   char *firstChar = &trace_buffer[loggerIndex];
+   memset(firstChar, ' ', maxTextLen);
+   vsnprintf(firstChar, maxTextLen, format, args);
    #ifdef SIM
    vnprintf(maxTextLen, format, args);
    #endif
+
    loggerIndex+=maxTextLen;
+
+   // Clean the 0 which clutters the display
+   for ( char *lastChar = &trace_buffer[loggerIndex-1]; lastChar!=firstChar; --lastChar) {
+      if ( *lastChar == '\0' ) {
+         *lastChar = ' ';
+         break;
+      }
+   }
 
    // Check if the message fits in the remaining buffer space
    if (loggerIndex >= LOGGER_BUFFER_SIZE) {
