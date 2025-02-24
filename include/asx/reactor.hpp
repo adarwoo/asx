@@ -188,7 +188,8 @@ namespace asx {
       class Mask {
          reactor_mask_t mask;
 
-      public:         // Constructor to initialize handle
+      public:         
+         // Constructor to initialize handle
          explicit Mask() : mask(0) {}
 
          // Constructor to initialize handle

@@ -8,15 +8,15 @@ namespace asx {
         using bitstore_t = BitStore<N>;
         using status_t = bitstore_t::storage_t;
 
-        auto inputs = bitstore_t{};
-        auto integrator = std::array<N, uint8_t>{};
+        bitstore_t inputs{};
+        std::array<uint8_t, N> integrator{};
 
     public:
         bitstore_t append(status_t raw_sample) {
             auto previous = inputs;
             auto sample = bitstore_t{raw_sample};
 
-            for (uint8_t i=0; i<sample.size(); ++i) {
+            for (uint8_t i=0; i<N; ++i) {
                 bool level = sample.get(i);
                 uint8_t thr = integrator[i];
 
@@ -26,7 +26,7 @@ namespace asx {
                     }
 
                     if ( integrator[i] == THR ) {
-                        input.set(i);
+                        inputs.set(i);
                     }
                 } else {
                     if ( integrator[i] > 0 ) {
@@ -34,18 +34,17 @@ namespace asx {
                     }
 
                     if ( integrator[i] == 0 ) {
-                        input.clear(i);
+                        inputs.reset(i);
                     }
                 }
             }
 
             // Return all bits which have changed to become 'true' (key is on)
-            return (previous ^ input) & input;
+            return (previous ^ inputs) & inputs;
         }
 
         bitstore_t status() {
             return inputs;
         }
     };
-
 }

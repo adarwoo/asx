@@ -1,4 +1,4 @@
-.PHONY: clean all
+.PHONY: clean all shell
 
 # Check if running inside Docker
 SWITCH_TO_DOCKER:=$(shell test -f /.dockerenv && echo no || echo yes)
@@ -21,8 +21,11 @@ DOCKER_RUN_CMD := $(ASX_DIR)buildenv make
 CMD_VARS=$(strip \
 	$(foreach var,$(.VARIABLES), $(if $(filter command line, $(origin $(var))),$(var)=$($(var)))))
 
-all $(filter-out all, $(MAKECMDGOALS)):
+all $(filter-out all shell, $(MAKECMDGOALS)):
 	@$(DOCKER_RUN_CMD) $@ $(CMD_VARS)
+
+shell:
+	@$(ASX_DIR)/buildenv
 else
 
 # By default, build for the AVR target. Export sim to build a simulator
@@ -103,29 +106,26 @@ LD               = $(if $(findstring .cpp,$(suffix $(SRCS))),$(LINK.cxx),$(LINK.
 BUILDDIRS        = $(sort $(dir $(OBJS)))
 
 # Manage the tracing flags
-# Argument to pass are trace=info dom="uart patch"
+# Argument to pass are trace=INFO dom="uart patch"
 # Default values for trace level and domains
-trace ?= WARN
+TRACE_LEVEL ?= WARN
 dom ?= ""
 
-# Convert trace level to uppercase
-TRACE_LEVEL_UPPER := $(strip $(shell echo $(trace) | tr a-z A-Z))
-
 # Map trace level to numeric values
-ifeq ($(TRACE_LEVEL_UPPER),ERROR)
+ifeq ($(TRACE_LEVEL),ERROR)
     TRACE_LEVEL_NUM := 0
-else ifeq ($(TRACE_LEVEL_UPPER),WARN)
+else ifeq ($(TRACE_LEVEL),WARN)
     TRACE_LEVEL_NUM := 1
-else ifeq ($(TRACE_LEVEL_UPPER),MILE)
+else ifeq ($(TRACE_LEVEL),MILE)
     TRACE_LEVEL_NUM := 2
-else ifeq ($(TRACE_LEVEL_UPPER),TRACE)
+else ifeq ($(TRACE_LEVEL),TRACE)
     TRACE_LEVEL_NUM := 3
-else ifeq ($(TRACE_LEVEL_UPPER),INFO)
+else ifeq ($(TRACE_LEVEL),INFO)
     TRACE_LEVEL_NUM := 4
-else ifeq ($(TRACE_LEVEL_UPPER),DEBUG)
+else ifeq ($(TRACE_LEVEL),DEBUG)
     TRACE_LEVEL_NUM := 5
 else
-    $(error Invalid trace level: $(TRACE_LEVEL_UPPER))
+    $(error Invalid trace level: $(TRACE_LEVEL))
 endif
 
 # Convert domains to uppercase and add -D flags
@@ -204,5 +204,3 @@ help:
 	@echo "Trace: Set the variable trace={error,warn,mile,info,debug} and dom={<dom0>,<dom1>...}"
 
 endif # SWITCH_TO_DOCKER
-
-

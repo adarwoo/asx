@@ -174,6 +174,7 @@ namespace asx {
 
                auto wait_for_reply= [] {
                   using namespace std::chrono;
+                  Datagram::reset();
                   timeout_timer = react_on_reply_timeout.delay(10ms);
                };
 
@@ -189,6 +190,9 @@ namespace asx {
                      Datagram::reset();
 
                      next.invoke(); // Call directly
+
+                     // Add the CRC
+                     Datagram::ready_request();
 
                      // Get the SM to move to RTS as we cannot transition from within an action
                      react_on_ready_to_send();
@@ -208,7 +212,7 @@ namespace asx {
                , "waiting_for_reply"_s   + event<char_received> / handle_char   = "reception"_s
                , "waiting_for_reply"_s   + event<reply_timeout> / timeout_error = "idle"_s
                , "reception"_s           + event<t15_timeout>                   = "control_and_waiting"_s
-               , "reception"_s           + event<char_received> / handle_char   = "reception"_s
+               , "reception"_s           + event<char_received> / handle_char
                , "control_and_waiting"_s + event<t35_timeout>   / process_reply = "prevent_race"_s
                , "prevent_race"_s        + event<t40_timeout>                   = "idle"_s
                );
