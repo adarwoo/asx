@@ -20,7 +20,7 @@ space := $(empty) $(empty)
 DOCKER_RUN_CMD := $(ASX_DIR)buildenv make
 CMD_VARS=$(strip \
 	$(foreach var,$(.VARIABLES), $(if $(filter command line, $(origin $(var))),$(var)=$($(var)))))
-	
+
 all $(filter-out all shell, $(MAKECMDGOALS)):
 	@$(DOCKER_RUN_CMD) $@ $(CMD_VARS)
 
@@ -106,26 +106,23 @@ LD               = $(if $(findstring .cpp,$(suffix $(SRCS))),$(LINK.cxx),$(LINK.
 BUILDDIRS        = $(sort $(dir $(OBJS)))
 
 # Manage the tracing flags
-# Argument to pass are trace=info dom="uart patch"
+# Argument to pass are trace=INFO dom="uart patch"
 # Default values for trace level and domains
-trace ?= WARN
+TRACE_LEVEL ?= WARN
 dom ?= ""
 
-# Convert trace level to uppercase
-TRACE_LEVEL_UPPER := $(shell echo $(trace) | tr a-z A-Z)
-
 # Map trace level to numeric values
-ifeq ($(TRACE_LEVEL_UPPER), ERROR)
+ifeq ($(TRACE_LEVEL),ERROR)
     TRACE_LEVEL_NUM := 0
-else ifeq ($(TRACE_LEVEL_UPPER), WARN)
+else ifeq ($(TRACE_LEVEL),WARN)
     TRACE_LEVEL_NUM := 1
-else ifeq ($(TRACE_LEVEL_UPPER), MILE)
+else ifeq ($(TRACE_LEVEL),MILE)
     TRACE_LEVEL_NUM := 2
-else ifeq ($(TRACE_LEVEL_UPPER), TRACE)
+else ifeq ($(TRACE_LEVEL),TRACE)
     TRACE_LEVEL_NUM := 3
-else ifeq ($(TRACE_LEVEL_UPPER), INFO)
+else ifeq ($(TRACE_LEVEL),INFO)
     TRACE_LEVEL_NUM := 4
-else ifeq ($(TRACE_LEVEL_UPPER), DEBUG)
+else ifeq ($(TRACE_LEVEL),DEBUG)
     TRACE_LEVEL_NUM := 5
 else
     $(error Invalid trace level: $(TRACE_LEVEL))
@@ -172,7 +169,7 @@ $(BUILD_DIR)/%.rcd : %.json
 	$(MUTE)[ -d $(@D) ] || mkdir -p $(@D)
 	$(MUTE)$(COMPILE.rc) $@ $<
 
-%.hpp : %.conf.py $(ASX_DIR)/make/modbus_rtu_slave_rc.py
+%.hpp : %.conf.py $(ASX_DIR)/make/modbus_rtu_rc.py
 	@echo Generating $@ interface header code from $<
 	$(MUTE)[ -d $(@D) ] || mkdir -p $(@D)
 	$(MUTE)PYTHONPATH=$(ASX_DIR)/make python3 $< -o$@

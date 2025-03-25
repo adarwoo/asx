@@ -54,3 +54,12 @@ RUN set -xe \
 
 # Setting the command to launch
 CMD ["bash", "-l"]
+
+# Get Polaris
+RUN set -xe \
+  && cd /opt \
+  && wget https://wabtec-test.cop.blackduck.com/api/tools/v2/downloads/polaris_cli-linux64-2024.12.0.zip \
+  && unzip polaris_cli-linux64-2024.12.0.zip \
+  && ln -s polaris_cli-linux64-2024.12.0 polaris \
+  && echo 'PATH=$PATH:/opt/polaris/bin' >> /etc/bash.bashrc \
+  && rm polaris_cli-linux64-2024.12.0.zip

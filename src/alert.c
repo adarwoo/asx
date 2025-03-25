@@ -11,6 +11,7 @@
 #include <avr/wdt.h>
 
 #include <assert.h>
+#include <string.h>
 #include <ioport.h>
 
 // Need to include the configuration to determine the alert pin
@@ -54,7 +55,8 @@ void alert_record( bool doAbort, int line, const char *file )
    cli();
 
    // Write the alert in the trace
-   trace("***ALERT***: %u %s", line, file);
+   const char *last_slash = strrchr(file, '/'); // Find the last '/'
+   trace("ALERT!%u %s", line, (last_slash) ? last_slash + 1 : file);
 
    // Dump to the debug pin
    #ifdef ALERT_OUTPUT_PIN

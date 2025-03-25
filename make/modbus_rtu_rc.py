@@ -116,7 +116,7 @@ namespace @NAMESPACE@ {
         }
 
         static void process_char(const uint8_t c) noexcept {
-            trace("Char: 0x%.2x, index: %d, state: %d", c, cnt, (uint8_t)state);
+            trace("RX C=%2x@%d=%d", c, cnt, (uint8_t)state);
 
             if (state == state_t::IGNORE) {
                 return;
@@ -166,6 +166,15 @@ namespace @NAMESPACE@ {
             default:
                 break;
             }
+        }
+
+        /** Called when a T3.5 has been detected, in a good sequence */
+        static void ready_request() noexcept {
+            // Add the CRC
+            crc.reset();
+            auto _crc = crc.update(std::string_view{(char *)buffer, cnt});
+            buffer[cnt++] = _crc & 0xff;
+            buffer[cnt++] = _crc >> 8;
         }
 
         static std::string_view get_buffer() noexcept {

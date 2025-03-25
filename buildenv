@@ -41,6 +41,13 @@ else
    core_count=$(nproc)
 fi
 
+# Force a build of the docker
+if [[ "$1" == "build" ]]; then
+   cd $this_dir
+   docker build -t $image . || { echo "Failed to build the docker image"; exit; }
+   exit
+fi
+
 # Run make or start a shell
 if [[ $1 == "make" ]]; then
    shift
