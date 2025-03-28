@@ -160,12 +160,15 @@ namespace @NAMESPACE@ {
         }
 
         /** Called when a T3.5 has been detected, in a good sequence */
-        static void process_reply() noexcept {
+        static bool process_reply() noexcept {
+            bool retval = true;
             switch(state) {
             @CALLBACKS@
             default:
+                retval = false;
                 break;
             }
+            return retval;
         }
 
         /** Called when a T3.5 has been detected, in a good sequence */
