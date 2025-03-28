@@ -135,7 +135,7 @@ namespace asx {
                         == TWI_BUSSTATE_IDLE_gc);
             }
 
-            static inline status_code_t get_status() const {
+            static inline status_code_t get_status() {
                 return status;
             }
         private:
