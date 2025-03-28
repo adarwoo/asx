@@ -1,7 +1,7 @@
-#include <cstdlib>
-#include <cstring>
-#include <cstdint>
-#include <cstdarg>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdarg.h>
 
 #include <trace.h>
 
@@ -34,17 +34,12 @@ trace_init( void )
    memset(trace_buffer, TRACE_END_CHAR, LOGGER_BUFFER_SIZE);
 }
 
-static void printNumber(uint16_t n, char *) {
-
-}
-
 /**
  * Printf like function trace API. The format is as follow:
  * i=integer, u=unsigned, x=hex, s=string, c=char, b=bool
  */
 void trace(const char *format, ...) {
    // Constants for the format
-   const uint16_t timerLen = 5;    // 4 digits for elapsed time + 1 space
    const uint16_t maxTextLen = MAX_MESSAGE_SIZE - 6;
 
    // Calculate elapsed time since the last trace
@@ -82,25 +77,25 @@ void trace(const char *format, ...) {
          case 'u': {
             unsigned int u = va_arg(args, unsigned int);
             utoa(u, pBuf, 10);
-            loggerIndex += std::strlen(buffer);
+            loggerIndex += strlen(pBuf);
             break;
          }
          case 'i': {
             unsigned int u = va_arg(args, unsigned int);
             itoa(u, pBuf, 10);
-            loggerIndex += std::strlen(buffer);
+            loggerIndex += strlen(pBuf);
             break;
          }
          case 'x': {
             unsigned int u = va_arg(args, unsigned int);
             utoa(u, pBuf, 16);
-            loggerIndex += std::strlen(buffer);
+            loggerIndex += strlen(pBuf);
             break;
          }
          case 's': {
             const char* s = va_arg(args, const char*);
-            std::strncpy(pBuf, s, sizeof(trace_buffer) - loggerIndex - 1);
-            loggerIndex += std::strlen(s);
+            strncpy(pBuf, s, sizeof(trace_buffer) - loggerIndex - 1);
+            loggerIndex += strlen(s);
             break;
          }
          default:
