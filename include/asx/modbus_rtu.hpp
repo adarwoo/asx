@@ -148,17 +148,16 @@ namespace asx {
          using Timer = asx::hw_timer::TimerA<T>;
 
          // Keep a mask for all pending transmit requests
-         inline static auto pending_transmits = reactor::Mask{0};
+         inline static auto pending_transmits      = reactor::Mask{0};
 
          // Reactor for errors
-         inline static auto react_on_error = reactor::Handle{};
+         inline static auto react_on_error         = reactor::Handle{};
 
          // Reply timeout
          inline static auto react_on_reply_timeout = reactor::Handle{};
 
          // Initiate a transmit
          inline static auto react_on_ready_to_send = reactor::Handle{};
-
 
          // Store the timeout timer to cancel it
          inline static auto timeout_timer = asx::timer::Instance{};
@@ -169,8 +168,15 @@ namespace asx {
                using namespace boost::sml;
 
                auto start_timer   = [] { Timer::start(); };
-               auto process_reply = [] { timeout_timer.cancel(); Datagram::process_reply(); };
-               auto timeout_error = [] { react_on_error(); };
+               
+               auto process_reply = [] { 
+                  timeout_timer.cancel(); 
+                  if ( not Datagram::process_reply() ) {
+                     react_on_error.notify(Datagram::get_buffer()[0], false);
+                  }
+               };
+
+               auto timeout_error = [] { react_on_error.notify(Datagram::get_buffer()[0], true); };
 
                auto wait_for_reply= [] {
                   using namespace std::chrono;
@@ -245,7 +251,7 @@ namespace asx {
       }
 
       public:
-         static void init() {
+         static void init(asx::reactor::Handle error_reactor = asx::reactor::Handle{}) {
             Timer::init(hw_timer::single_use);
             Uart::init();
 
@@ -272,6 +278,9 @@ namespace asx {
 
             // React on timeout
             react_on_reply_timeout = reactor::bind(on_reply_timeout);
+
+            // Plug the timeout handler
+            react_on_error = error_reactor;
 
             // Start the SM
             sm.process_event(can_start{});

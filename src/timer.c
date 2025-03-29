@@ -249,8 +249,7 @@ timer_instance_t _timer_arm(
 	while (insertPoint != _timer_slot_avail)
 	{
 		// The count is relative to the current position
-		// Depending of where we are, we need to decide if the new count is a roll
-		//  over
+		// Depending of where we are, we need to decide if the new count is a roll over
 		if (
 			_timer_distance_of(now, count) <
 			_timer_distance_of(now, _timer_future_sorted_list[insertPoint].count))
@@ -279,11 +278,11 @@ timer_instance_t _timer_arm(
 
 	// Insert the new item
 	_timer_future_t next = {
-		 .reactor = reactor,
-		 .instance = retval,
-		 .count = count,
-		 .repeat = repeat,
-		 .arg = arg
+		.reactor = reactor,
+		.instance = retval,
+		.count = count,
+		.repeat = repeat,
+		.arg = arg
 	};
 
 	_timer_future_sorted_list[insertPoint] = next;
@@ -361,13 +360,21 @@ void timer_dispatch(void *arg)
 			// Is it a repeating instance
 			if (pFuture->repeat)
 			{
+				timer_count_t next_count = pFuture->count + pFuture->repeat;
+
+				// If the system is under heavy load, the next_count could be in the past
+				// In such case, move it to now
+				if ( next_count < timeNow ) {
+					next_count = timeNow;
+				}
+
 				_timer_arm(
-               pFuture->reactor,
-               pFuture->count + pFuture->repeat,
-               pFuture->repeat,
-               pFuture->instance,
-               NULL
-            );
+                   pFuture->reactor,
+                   next_count,
+                   pFuture->repeat,
+                   pFuture->instance,
+                   NULL
+                );
 			}
 
 			// Move the pointer to the next item
@@ -385,7 +392,7 @@ void timer_dispatch(void *arg)
 
 /**
  * Cancel a timer instance to reclaim the timer slot.
- * If the timer has not expire yet, cancels the timer.
+ * If the timer has not expired yet, cancels the timer.
  * Effectively stops repeating timers.
  *
  * The result is that the slot used by the timer becomes available at the end of the call, but

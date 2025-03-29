@@ -1,9 +1,9 @@
-#include <trace.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+
+#include <trace.h>
 
 #include <timer.h>
 
@@ -34,9 +34,12 @@ trace_init( void )
    memset(trace_buffer, TRACE_END_CHAR, LOGGER_BUFFER_SIZE);
 }
 
+/**
+ * Printf like function trace API. The format is as follow:
+ * i=integer, u=unsigned, x=hex, s=string, c=char, b=bool
+ */
 void trace(const char *format, ...) {
    // Constants for the format
-   const uint16_t timerLen = 5;    // 4 digits for elapsed time + 1 space
    const uint16_t maxTextLen = MAX_MESSAGE_SIZE - 6;
 
    // Calculate elapsed time since the last trace
@@ -45,7 +48,7 @@ void trace(const char *format, ...) {
    lastTimerCount = currentTimerCount;
 
    trace_buffer[loggerIndex++] = '[';
-   snprintf(&trace_buffer[loggerIndex], timerLen, "%04lu", elapsedTime % 10000);
+   utoa(elapsedTime % 10000, &trace_buffer[loggerIndex], 10);
 
    if (elapsedTime > 9999) {
       trace_buffer[loggerIndex] = '+';
@@ -55,22 +58,58 @@ void trace(const char *format, ...) {
    trace_buffer[loggerIndex++] = ']';
    va_list args;
    va_start(args, format);
-   char *firstChar = &trace_buffer[loggerIndex];
-   memset(firstChar, ' ', maxTextLen);
-   vsnprintf(firstChar, maxTextLen, format, args);
-   #ifdef SIM
-   vnprintf(maxTextLen, format, args);
-   #endif
 
-   loggerIndex+=maxTextLen;
+   // Iterate the string. Look out for %
+   char c = trace_buffer[loggerIndex];
 
-   // Clean the 0 which clutters the display
-   for ( char *lastChar = &trace_buffer[loggerIndex-1]; lastChar!=firstChar; --lastChar) {
-      if ( *lastChar == '\0' ) {
-         *lastChar = ' ';
-         break;
+   while ((c = *format++) != '\0') {
+      if (c == '%')  {
+         c = *format++;
+         char *pBuf = &trace_buffer[loggerIndex++];
+
+         switch (c) {
+         case 'b': {
+            bool b = va_arg(args, int); // bool is promoted to int
+            pBuf = b ? "1" : "0";
+            ++loggerIndex;
+            break;
+         }
+         case 'u': {
+            unsigned int u = va_arg(args, unsigned int);
+            utoa(u, pBuf, 10);
+            loggerIndex += strlen(pBuf);
+            break;
+         }
+         case 'i': {
+            unsigned int u = va_arg(args, unsigned int);
+            itoa(u, pBuf, 10);
+            loggerIndex += strlen(pBuf);
+            break;
+         }
+         case 'x': {
+            unsigned int u = va_arg(args, unsigned int);
+            utoa(u, pBuf, 16);
+            loggerIndex += strlen(pBuf);
+            break;
+         }
+         case 's': {
+            const char* s = va_arg(args, const char*);
+            strncpy(pBuf, s, sizeof(trace_buffer) - loggerIndex - 1);
+            loggerIndex += strlen(s);
+            break;
+         }
+         default:
+            trace_buffer[loggerIndex++] = c;
+            break;
+         }
+      }
+      else
+      {
+         trace_buffer[loggerIndex++] = c;
       }
    }
+
+   memset(&trace_buffer[loggerIndex], ' ', maxTextLen);
 
    // Check if the message fits in the remaining buffer space
    if (loggerIndex >= LOGGER_BUFFER_SIZE) {
