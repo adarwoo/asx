@@ -134,6 +134,11 @@ namespace asx {
                 return ((TWI0.MSTATUS & TWI_BUSSTATE_gm)
                         == TWI_BUSSTATE_IDLE_gc);
             }
+
+            /// Get the status code
+            static inline status_code_t get_status() {
+               return status;
+            }
         private:
             static void write_handler();
             static void read_handler();

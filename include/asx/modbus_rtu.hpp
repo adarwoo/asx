@@ -311,13 +311,10 @@ namespace asx {
 
             switch ( Datagram::get_status() ) {
                case Datagram::status_t::NOT_FOR_ME:
-                  trace("Frame is not for me");
                   break;
                case Datagram::status_t::BAD_CRC:
-                  trace("Bad CRC");
                   break;
                case Datagram::status_t::GOOD_FRAME:
-                  trace("Good Frame received");
                   return true;
                default:
                   break;
