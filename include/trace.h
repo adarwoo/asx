@@ -6,6 +6,11 @@
 #define TRACE_LEVEL_INFO    3
 #define TRACE_LEVEL_DEBUG   4
 
+// Include the project trace config
+#ifdef HAS_TRACE_CONFIG_FILE
+#include "conf_trace.h"
+#endif
+
 // Default trace level is warning
 #ifndef TRACE_LEVEL
 #define TRACE_LEVEL TRACE_LEVEL_WARN

@@ -34,20 +34,25 @@ namespace asx {
       public:
          PCA9555(uint8_t _chip);
 
+         //
+         // Note : In all 16-bits operation, the MSB is sent first
+         // So, if creating bit set, the first bit is bit0 of port 0
+         //
+
          void read(CompleteCb cb=nullptr) {
-            read(2, command_t::read0, cb);
+            read(2, command_t::read1, cb);
          }
 
          void set_value(uint16_t value, CompleteCb cb=nullptr) {
-            transfer(command_t::write0, value, cb);
+            transfer(command_t::write1, value, cb);
          }
 
          void set_dir(uint16_t dir, CompleteCb cb=nullptr) {
-            transfer(command_t::set_dir0, dir, cb);
+            transfer(command_t::set_dir1, dir, cb);
          }
 
          void set_pol(uint16_t pol, CompleteCb cb=nullptr) {
-            transfer(command_t::set_pol0, pol, cb);
+            transfer(command_t::set_pol1, pol, cb);
          }
 
          template<unsigned PORT>

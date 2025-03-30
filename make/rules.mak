@@ -105,35 +105,8 @@ LD               = $(if $(findstring .cpp,$(suffix $(SRCS))),$(LINK.cxx),$(LINK.
 # Allow the source to be in sub-directories
 BUILDDIRS        = $(sort $(dir $(OBJS)))
 
-# Manage the tracing flags
-# Argument to pass are trace=INFO dom="uart patch"
-# Default values for trace level and domains
-TRACE_LEVEL ?= WARN
-dom ?= ""
-
-# Map trace level to numeric values
-ifeq ($(TRACE_LEVEL),ERROR)
-    TRACE_LEVEL_NUM := 0
-else ifeq ($(TRACE_LEVEL),WARN)
-    TRACE_LEVEL_NUM := 1
-else ifeq ($(TRACE_LEVEL),MILE)
-    TRACE_LEVEL_NUM := 2
-else ifeq ($(TRACE_LEVEL),TRACE)
-    TRACE_LEVEL_NUM := 3
-else ifeq ($(TRACE_LEVEL),INFO)
-    TRACE_LEVEL_NUM := 4
-else ifeq ($(TRACE_LEVEL),DEBUG)
-    TRACE_LEVEL_NUM := 5
-else
-    $(error Invalid trace level: $(TRACE_LEVEL))
-endif
-
-# Convert domains to uppercase and add -D flags
-DOMAINS_UPPER := $(shell echo $(dom) | tr a-z A-Z | tr ',' ' ')
-DOMAIN_FLAGS := $(foreach domain, $(DOMAINS_UPPER), -DDOMAIN_$(domain)_ENABLED=1)
-
-# Add trace level and domain flags to CPPFLAGS
-CPPFLAGS += -DTRACE_LEVEL=$(TRACE_LEVEL_NUM) $(DOMAIN_FLAGS)
+# Does the project have a trace config?
+CPPFLAGS += $(if $(wildcard $(TOP)/conf/conf_trace.h), -DHAS_TRACE_CONFIG_FILE,)
 
 all : $(BUILDDIRS) $(BUILD_DIR)/$(BIN)$(BIN_EXT)
 

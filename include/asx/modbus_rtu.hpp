@@ -64,31 +64,35 @@ namespace asx {
       struct can_start {
          constexpr const char *c_str() const  { return "can_start"; }
       };
-
       struct t15_timeout {
-         constexpr const char *c_str() const { return "t15_to"; }
+         constexpr const char *c_str() const { return "t15"; }
       };
       struct t35_timeout {
-         constexpr const char *c_str() const { return "t35_to"; }
+         constexpr const char *c_str() const { return "t35"; }
       };
       struct t40_timeout {
-         constexpr const char *c_str() const { return "t40_to"; }
+         constexpr const char *c_str() const { return "t40"; }
       };
       struct reply_timeout {
-         constexpr const char *c_str() const { return "reply_to"; }
+         constexpr const char *c_str() const { return "reply_timeout"; }
       };
       struct rts  {
          constexpr const char *c_str() const { return "rts"; }
       };
       struct char_received {
-          uint8_t c{};
-         constexpr const char *c_str() const { return "char_rxd"; }
+         uint8_t c{};
+
+         const char *c_str() const {
+            static char desc[] = "char_rxd=0x..";
+            utoa(c, desc+11, 16);
+            return desc;
+         }
       };
       struct frame_sent  {
          constexpr const char *c_str() const { return "frame_sent"; }
       };
       struct check_pendings {
-         constexpr const char *c_str() const { return "check_pend"; }
+         constexpr const char *c_str() const { return "check_pendings"; }
       };
 
 
@@ -120,22 +124,22 @@ namespace asx {
       struct Logging {
          template <class SM, class TEvent>
          void log_process_event(const TEvent& evt) {
-            trace("[evt] %s", (char*)evt.c_str());
+            TRACE_INFO(DG, "[evt] %s", (char*)evt.c_str());
          }
 
          template <class SM, class TGuard, class TEvent>
          void log_guard(const TGuard&, const TEvent&, bool result) {
-            trace("[grd]");
+            TRACE_INFO(DG, "[grd]");
          }
 
          template <class SM, class TAction, class TEvent>
          void log_action(const TAction& act, const TEvent& evt) {
-            trace("[act]");
+            TRACE_INFO(DG, "[act]");
          }
 
          template <class SM, class TSrcState, class TDstState>
          void log_state_change(const TSrcState& src, const TDstState& dst) {
-            trace("[>] %s -> %s", src.c_str(), dst.c_str());
+            TRACE_INFO(DG, "[>] %s -> %s", src.c_str(), dst.c_str());
          }
       };
 
@@ -168,9 +172,9 @@ namespace asx {
                using namespace boost::sml;
 
                auto start_timer   = [] { Timer::start(); };
-               
-               auto process_reply = [] { 
-                  timeout_timer.cancel(); 
+
+               auto process_reply = [] {
+                  timeout_timer.cancel();
                   if ( not Datagram::process_reply() ) {
                      react_on_error.notify(Datagram::get_buffer()[0], false);
                   }
@@ -267,11 +271,11 @@ namespace asx {
             // Add reactor handler for the big timeout
             Timer::react_on_overflow(reactor::bind(on_timeout_t40, reactor::low));
 
+            // Add a reactor handler for when the transmit is complete
+            Uart::react_on_send_complete(reactor::bind(on_send_complete, reactor::prio::high));
+
             // Add reactor handler for the Uart
             Uart::react_on_character_received(reactor::bind(on_rx_char));
-
-            // Add a reactor handler for when the transmit is complete
-            Uart::react_on_send_complete(reactor::bind(on_send_complete));
 
             // Add a reactor to intiate the transmittion
             react_on_ready_to_send = reactor::bind(on_ready_to_send);

@@ -23,6 +23,7 @@ namespace asx {
       }
 
       // Set a value and read
+      // Note: In a 16-bit number, the MSB is port 1
       void PCA9555::transfer(command_t op, uint16_t value, CompleteCb cb) {
          package.chip = chip;
          package.addr[0] = (uint8_t)op;

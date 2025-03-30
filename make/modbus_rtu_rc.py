@@ -116,7 +116,7 @@ namespace @NAMESPACE@ {
         }
 
         static void process_char(const uint8_t c) noexcept {
-            trace("RX C=%2x@%d=%d", c, cnt, (uint8_t)state);
+            TRACE_DEBUG(DG, "RX[%d]<%2x (%d)", cnt, c, (uint8_t)state);
 
             if (state == state_t::IGNORE) {
                 return;
@@ -266,7 +266,7 @@ namespace @NAMESPACE@ {
         }
 
         static void process_char(const uint8_t c) noexcept {
-            trace("Char: 0x%.2x, index: %d, state: %d", c, cnt, (uint8_t)state);
+            TRACE_DEBUG(DG, "RX[%d]<%2x (%d)", cnt, c, (uint8_t)state);
 
             if (state == state_t::IGNORE) {
                 return;
