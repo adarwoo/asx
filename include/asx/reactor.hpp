@@ -86,7 +86,6 @@ namespace asx {
             reactor_notify(handle, reinterpret_cast<void*>(static_cast<uintptr_t>(packed)));
          }
 
-
          // Invoke (direct call of the handler) no arg
          void invoke() {
             reactor_invoke(handle, nullptr);
@@ -246,6 +245,30 @@ namespace asx {
       static inline void clear(Mask m) { reactor_clear(m); }
 
       static inline void notify_from_isr(Handle on_xx) { reactor_null_notify_from_isr(on_xx); }
+
+      // Yield - no arg
+      inline void yield() {
+         reactor_yield(NULL);
+      }
+
+      // Yield - single arg
+      template <typename T>
+      inline void yield(T arg) {
+         reactor_yield(reinterpret_cast<void*>(static_cast<uintptr_t>(arg)));
+      }
+
+      // Yield 2 args
+      template <typename T1, typename T2>
+      inline void yield(T1 arg1, T2 arg2) {
+         // Helper function to pack two 16-bit values into a single 32-bit integer
+         constexpr auto pack = [](uint8_t a, uint8_t b) -> uint16_t {
+            return (static_cast<uint16_t>(a) << 8) | static_cast<uint16_t>(b);
+         };
+
+         uint32_t packed = pack(static_cast<uint8_t>(arg1), static_cast<uint8_t>(arg2));
+         reactor_yield(reinterpret_cast<void*>(static_cast<uintptr_t>(packed)));
+      }
+
 
       static inline void run() { reactor_run(); }
    }

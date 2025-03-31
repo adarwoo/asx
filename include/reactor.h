@@ -83,6 +83,9 @@ void reactor_clear( reactor_mask_t mask );
 /** Process the reactor loop */
 void reactor_run(void);
 
+/** Allow a running handler to yeild some time and getting scheduled right after */
+void reactor_yield(void *arg);
+
 /**
  * ISR version where no data is passed - the fastest notification in 6 cycles
  * Make sure to activate -flto to inline this function

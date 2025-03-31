@@ -64,6 +64,9 @@ static reactor_item_t _handlers[REACTOR_MAX_HANDLERS] = {0};
 /** Lock new registrations once the reactor is started */
 static bool _reactor_lock = false;
 
+/** Store the current handler */
+static reactor_handle_t _reactor_running_handle = REACTOR_NULL_HANDLE;
+
 /** Notification registry */
 #define _reactor_notifications *((uint32_t*)(&GPIO0))
 
@@ -213,6 +216,14 @@ void reactor_clear(reactor_mask_t mask)
    sei();
 }
 
+/**
+ * Allow a running handler to give some time back.
+ * The call will re-invole the current running reactor handler
+ */
+void reactor_yield(void *data) {
+   reactor_notify(_reactor_running_handle, data);
+}
+
 /** Process the reactor loop */
 void reactor_run(void)
 {
@@ -283,7 +294,9 @@ void reactor_run(void)
          sei();
 
          debug_set(REACTOR_BUSY);
+         _reactor_running_handle = index;
          _handlers[index].handler(_handlers[index].arg);
+         _reactor_running_handle = REACTOR_NULL_HANDLE;
 
          // Keep the system alive for as long as the reactor is calling handlers
          // We assume that if no handlers are called, the system is dead.
