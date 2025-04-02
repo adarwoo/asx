@@ -58,18 +58,24 @@ typedef volatile int_fast8_t _timer_slot_t;
 /** Invalid slot marker */
 #define TIMER_INVALID_SLOT -1
 
-/** Default the timer to TCB1 (the last one) */
-#ifndef TIMER_TCB_NUMBER
-#  define TIMER_TCB_NUMBER 1
+/** Select the PIT time source by default */
+#if defined(TIMER_USE_PIT) + defined(TIMER_USE_TCB0) + defined(TIMER_USE_TCB1) > 1
+#  error "Only one TIMER_USE_* should be defined"
+#elif !defined(TIMER_USE_PIT) && !defined(TIMER_USE_TCB0) && !defined(TIMER_USE_TCB1)
+#  define TIMER_USE_PIT
 #endif
 
-#if TIMER_TCB_NUMBER == 0
+#if defined(TIMER_USE_TCB0)
 #  define TIMER_TCB TCB0
 #  define TIMER_TCB_INT_VECTOR TCB0_INT_vect
-#else
+#elif defined(TIMER_USE_TCB1)
 #  define TIMER_TCB TCB1
 #  define TIMER_TCB_INT_VECTOR TCB1_INT_vect
+#elif defined(TIMER_USE_PIT)
+#  define TIMER_TCB PIT
+#  define TIMER_TCB_INT_VECTOR PIT_INT_vect
 #endif
+
 
 /**
  * @def TIMER_PRIO
@@ -170,13 +176,24 @@ static void
 	// Interrupt code for the AVR target only
 	// This is initialised automatically for the simulator
 #ifndef _WIN32
+#ifdef TIMER_USE_PIT
+	// Use the 32768 clock
+	RTC_CLKSEL = RTC_CLKSEL_TOSC32K_gc;
+	// Don't prescale, no correction, enable
+	RTC_CTRLA = RTC_PRESCALER_DIV1_gc | RTC_RTCEN_bm;
+	// Set the periodic interrupt to 1.024ms and activate
+	RTC_PITCTRLA = RTC_PERIOD_CYC32_gc | RTC_PITEN_bm;
+	// Enable the interrupt
+	RTC_PITINTCTRL |= RTC_PITEN_bm;
+#else
 	// Use the Timer type B 1 to create a 1ms interrupt for the reactor
-	TIMER_TCB.CNT = 0;												 // Reset the timer
-	TIMER_TCB.CCMP = 10000;										 // 1ms timer
-	TIMER_TCB.DBGCTRL = 0;											 // Stop the timer on a break point
+	TIMER_TCB.CNT = 0;									  // Reset the timer
+	TIMER_TCB.CCMP = 10000;								  // 1ms timer
+	TIMER_TCB.DBGCTRL = 0;								  // Stop the timer on a break point
 	TIMER_TCB.CTRLA = TCB_CLKSEL_DIV2_gc | TCB_ENABLE_bm; // 10Mhz
-	TIMER_TCB.CTRLB = TCB_CNTMODE_INT_gc;						 // Periodic interrupt mode
-	TIMER_TCB.INTCTRL = TCB_CAPT_bm;							 // Turn on 'capture' interrupt
+	TIMER_TCB.CTRLB = TCB_CNTMODE_INT_gc;				  // Periodic interrupt mode
+	TIMER_TCB.INTCTRL = TCB_CAPT_bm;					  // Turn on 'capture' interrupt
+#endif
 #endif
 
    // Reset the internal
@@ -187,6 +204,29 @@ static void
 
 	// Register with the reactor
 	_timer_reactor_handle = reactor_register(&timer_dispatch, TIMER_PRIO);
+}
+
+
+/**
+ * Called by the timer ISR every 1ms or 1.024ms
+ * Only increment the timer if the dispatch has been called.
+ * This guarantees, all handlers are called in time.
+ * Takes around 70 CPU cycles
+ */
+#if TIMER_SOURCE == PIT
+ISR(RTC_PIT_vect) {
+	// Clear the flag
+	RTC_PITINTFLAGS |= RTC_PITEN_bm;
+#else
+ISR(TIMER_TCB_INT_VECTOR) {
+	// Clear the flag
+	TIMER_TCB.INTFLAGS |= TCB_OVF_bm;
+#endif
+
+	++_timer_free_running_ms_counter;
+
+	// Tell the reactor to process the tick
+	reactor_null_notify_from_isr(_timer_reactor_handle);
 }
 
 /**
@@ -319,23 +359,6 @@ timer_instance_t timer_arm(
    return _timer_arm(reactor, count, repeat, TIMER_INVALID_INSTANCE, arg);
 }
 
-
-/**
- * Called by the timer ISR every 1ms
- * Only increment the timer if the dispatch has been called.
- * This guarantees, all handlers are called in time.
- * Takes around 70 CPU cycles
- */
-ISR(TIMER_TCB_INT_VECTOR)
-{
-	// Clear the flag
-	TIMER_TCB.INTFLAGS |= TCB_OVF_bm;
-
-	++_timer_free_running_ms_counter;
-
-	// Tell the reactor to process the tick
-	reactor_null_notify_from_isr(_timer_reactor_handle);
-}
 
 /**
  * Allow processing timer events in a reactor pattern.
