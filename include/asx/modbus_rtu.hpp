@@ -164,14 +164,16 @@ namespace asx {
          inline static auto react_on_ready_to_send = reactor::Handle{};
 
          // Store the timeout timer to cancel it
-         inline static auto timeout_timer = asx::timer::Instance{};
+         inline static auto timeout_timer          = asx::timer::Instance{};
 
          struct StateMachine {
             // Internal SM
             auto operator()() {
                using namespace boost::sml;
 
-               auto start_timer   = [] { Timer::start(); };
+               auto start_timer   = [] { 
+                  Timer::start(); 
+               };
 
                auto process_reply = [] {
                   timeout_timer.cancel();
@@ -180,7 +182,9 @@ namespace asx {
                   }
                };
 
-               auto timeout_error = [] { react_on_error.notify(Datagram::get_buffer()[0], true); };
+               auto timeout_error = [] { 
+                  react_on_error.notify(Datagram::get_buffer()[0], true);
+               };
 
                auto wait_for_reply= [] {
                   using namespace std::chrono;
