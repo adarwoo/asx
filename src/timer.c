@@ -178,7 +178,7 @@ static void
 #ifndef _WIN32
 #ifdef TIMER_USE_PIT
 	// Use the 32768 clock
-	RTC_CLKSEL = RTC_CLKSEL_TOSC32K_gc;
+	RTC_CLKSEL = RTC_CLKSEL_INT32K_gc;
 	// Don't prescale, no correction, enable
 	RTC_CTRLA = RTC_PRESCALER_DIV1_gc | RTC_RTCEN_bm;
 	// Set the periodic interrupt to 1.024ms and activate
@@ -213,7 +213,7 @@ static void
  * This guarantees, all handlers are called in time.
  * Takes around 70 CPU cycles
  */
-#if TIMER_SOURCE == PIT
+#ifdef TIMER_USE_PIT
 ISR(RTC_PIT_vect) {
 	// Clear the flag
 	RTC_PITINTFLAGS |= RTC_PITEN_bm;
