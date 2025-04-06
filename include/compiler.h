@@ -769,7 +769,6 @@ static inline int_fast8_t ilog2(uint32_t x)
  * \note More optimized if only used with values known at compile time.
  */
 #define Min(a, b)           (((a) < (b)) ?  (a) : (b))
-#define min(a, b)           Min(a, b)
 
 /*! \brief Takes the maximal value of \a a and \a b.
  *
@@ -781,7 +780,6 @@ static inline int_fast8_t ilog2(uint32_t x)
  * \note More optimized if only used with values known at compile time.
  */
 #define Max(a, b)           (((a) > (b)) ?  (a) : (b))
-#define max(a, b)           Max(a, b)
 
 //! @}
 

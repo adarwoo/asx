@@ -36,7 +36,6 @@
 #include "debug.h"
 #include "reactor.h"
 
-#include "debug.h"
 
 /**
  * @def REACTOR_MAX_HANDLERS
@@ -50,6 +49,10 @@
 static const uint8_t bit_shift_table[8] = {
    0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 };
+
+#ifdef DEBUG
+bool _reactor_stop_on_next = false;
+#endif
 
 /** Holds all reactor handlers with mapping to the reaction mask */
 typedef struct
@@ -160,7 +163,7 @@ reactor_handle_t reactor_mask_pop(reactor_mask_t *mask) {
 
    if ( *mask != 0 ) {
       // Count first
-      uint8_t pos = __builtin_ctz(*mask);
+      uint8_t pos = __builtin_ctzl(*mask);
       retval = (reactor_handle_t)pos;
       reactor_mask_t pop_msk = reactor_mask_of(retval);
 
@@ -295,6 +298,13 @@ void reactor_run(void)
 
          debug_set(REACTOR_BUSY);
          _reactor_running_handle = index;
+
+         #ifdef DEBUG
+         if ( _reactor_stop_on_next == true ) {
+            asm("break");
+         };
+         #endif
+
          _handlers[index].handler(_handlers[index].arg);
          _reactor_running_handle = REACTOR_NULL_HANDLE;
 

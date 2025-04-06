@@ -47,7 +47,7 @@ TEMPLATE_CODE_MASTER="""#pragma once
  */
 #include <stdint.h>
 #include <trace.h>
-#include <asx/modbus_rtu.hpp>
+#include <asx/modbus_rtu_master.hpp>
 
 namespace @NAMESPACE@ {
     // All callbacks registered
@@ -57,6 +57,9 @@ namespace @NAMESPACE@ {
     enum class state_t : uint8_t {
         IGNORE = 0,
         ERROR = 1,
+        BAD_REQUEST, // The slave indicates an error
+        BAD_REQUEST__CRC,
+        BAD_REQUEST_CONFIRMED,
         @ENUMS@
     };
 
@@ -122,21 +125,33 @@ namespace @NAMESPACE@ {
                 return;
             }
 
+            // Compute the CRC on the go
             crc(c);
 
-            if (state != state_t::ERROR) {
-                // Store the frame
-                buffer[cnt++] = c; // Store the data
-            }
+            // Keep count
+            ++cnt;
 
             switch(state) {
             case state_t::ERROR:
                 break;
             @CASES@
+            case state_t::BAD_REQUEST:
+                state = state_t::BAD_REQUEST__CRC;
+                break;
+            case state_t::BAD_REQUEST__CRC:
+                if ( cnt == 5 ) {
+                    state = state_t::BAD_REQUEST_CONFIRMED;
+                }
+                break;
             default:
                 error = error_t::illegal_data_value;
                 state = state_t::ERROR;
                 break;
+            }
+
+            if (state != state_t::ERROR) {
+                // Store the frame
+                buffer[cnt-1] = c; // Store the data
             }
         }
 
@@ -160,12 +175,21 @@ namespace @NAMESPACE@ {
         }
 
         /** Called when a T3.5 has been detected, in a good sequence */
-        static bool process_reply() noexcept {
-            bool retval = true;
+        static error_t process_reply() noexcept {
+            auto retval = error_t::ok;
+
             switch(state) {
             @CALLBACKS@
+            case state_t::BAD_REQUEST_CONFIRMED:
+                // Make sure the error is compatible
+                if ( buffer[2] > 0 && buffer[2] < static_cast<uint8_t>(error_t::unknown_error) ) {
+                    retval = static_cast<error_t>(buffer[2]);
+                } else {
+                    retval = error_t::unknown_error;
+                }
+                break;
             default:
-                retval = false;
+                retval = error_t::ignore_frame;
                 break;
             }
             return retval;
@@ -201,7 +225,7 @@ TEMPLATE_CODE_SLAVE="""#pragma once
  */
 #include <stdint.h>
 #include <trace.h>
-#include <asx/modbus_rtu.hpp>
+#include <asx/modbus_rtu_slave.hpp>
 
 namespace @NAMESPACE@ {
     // All callbacks registered
@@ -716,17 +740,21 @@ class State:
 
         if self.pos == 0 and self.mode == "master":
             retval += f"{tab}{INDENT}".join(["",
-                "// In master mode, the first received chat must match the send request\n",
+                "// The address must match the address just send and still in the buffer\n",
                 "if ( c != buffer[0] ) {\n",
-                "   state = state_t::ERROR;\n",
-                "   break;\n",
-                "}\n\n"]
+                "    error = error_t::ignore_frame;\n",
+                "    state = state_t::IGNORE;\n",
+                "    break;\n",
+                "}\n"]
             )
 
         if self.pos == 1 and self.mode == "master":
             retval += f"{tab}{INDENT}".join(["",
-                "// In master mode, the second received chat must match the send request\n",
-                "if ( c != buffer[1] ) {\n",
+                "// The command must match the command just sent\n",
+                "if ( (c & 0x80) && (c != (0x80 | buffer[1])) ) {\n",
+                "   state = state_t::BAD_REQUEST;\n",
+                "   break;\n",
+                "} else if ( c != buffer[1] ) {\n",
                 "   state = state_t::ERROR;\n",
                 "   break;\n",
                 "}\n\n"]

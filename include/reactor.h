@@ -66,6 +66,16 @@ typedef void (*reactor_handler_t)(void*);
 reactor_handle_t reactor_register(
    const reactor_handler_t, reactor_priority_t);
 
+#ifdef DEBUG
+/** Flag used by inlinefunction */
+extern bool _reactor_stop_on_next;
+
+/** Request for a break point prior to calling the next handler */
+inline void reactor_break_on_next(void) {
+   _reactor_stop_on_next = true;
+}
+#endif
+
 /**
  * Notify a handler should be invoke next time the loop is processed
  * Interrupt safe. No lock here since this is processed in normal

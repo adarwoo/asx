@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 #include <trace.h>
 
@@ -90,8 +91,27 @@ void trace(const char *format, ...) {
 
          switch (c) {
          case 'b': {
-            bool b = va_arg(args, int); // bool is promoted to int
+            bool b = va_arg(args, unsigned int); // bool is promoted to int
             pTrace = b ? "1" : "0";
+            break;
+         }
+         case 'c': {
+            unsigned int c = va_arg(args, unsigned int); // char is promoted to int when passed in ...
+            if ( isalnum(c) ) {
+               number_buffer[0] = '\'';
+               number_buffer[1] = (char)c;
+               number_buffer[2] = '\'';
+               number_buffer[3] = '\0';
+            } else {
+               static const char hex_digits[] = "0123456789ABCDEF";
+               number_buffer[0] = '0';
+               number_buffer[1] = 'x';
+               number_buffer[2] = hex_digits[(c >> 4) & 0x0F]; // high nibble
+               number_buffer[3] = hex_digits[c & 0x0F];        // low nibble
+               number_buffer[4] = '\0';
+            }
+
+            bCopyRequired = true;
             break;
          }
          case 'u': {
@@ -101,7 +121,7 @@ void trace(const char *format, ...) {
             break;
          }
          case 'd': {
-            unsigned int d = va_arg(args, unsigned int);
+            int d = va_arg(args, int);
             itoa(d, number_buffer, 10);
             bCopyRequired = true;
             break;

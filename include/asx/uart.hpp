@@ -34,11 +34,9 @@ namespace asx {
       enum class stop { _1=1, _2=2 };
 
       // Options
-      constexpr auto onewire = 1<<1;
-      constexpr auto rs485   = 1<<2;;
+      constexpr auto onewire             = 1<<1;
+      constexpr auto rs485               = 1<<2;;
       constexpr auto map_to_alt_position = 1<<3;
-      constexpr auto disable_rx = 1<<4;
-      constexpr auto disable_tx = 1<<5;
 
       // Configuration management
       template <typename Config>
@@ -102,14 +100,6 @@ namespace asx {
                retval |= USART_ODME_bm;
             }
 
-            if (Config::has(disable_rx)) {
-               retval &= (~USART_RXEN_bm);
-            }
-
-            if (Config::has(disable_rx)) {
-               retval &= (~USART_TXEN_bm);
-            }
-
             return retval;
          }
 
@@ -140,7 +130,6 @@ namespace asx {
 
             return retval;
          }
-
       public:
          static void init() {
             Config::init();
@@ -197,6 +186,16 @@ namespace asx {
             }
          }
 
+         /** Enable Rx */
+         static constexpr void enable_rx() {
+            get().CTRLB |= USART_RXEN_bm;
+         }
+
+         /** Disable Rx */
+         static constexpr void disable_rx() {
+            get().CTRLB &= ~USART_RXEN_bm;
+         }
+
          static void send(const std::string_view view_to_send) {
             // Store the view to transmit
             to_send = view_to_send;
@@ -250,10 +249,11 @@ namespace asx {
                on_usart0_rx_complete = reactor;
             } else {
                on_usart1_rx_complete = reactor;
-               // Enable the interrupt
-               get().CTRLA |= USART_RXCIE_bm;
             }
-		   }
+
+            // Since a reactor is handling the data, enable the interrupt
+            get().CTRLA |= USART_RXCIE_bm;
+         }
 
          static asx::chrono::cpu_tick_t get_byte_duration(const float length_multipler=1.0) {
             int width = 1 /* start bit */

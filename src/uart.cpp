@@ -28,6 +28,8 @@ namespace asx {
          on_usart1_rx_complete.notify(c);
       }
 
+      // The entire frame in the Transmit Shift register has been shifted out and there
+      //  are no new data in the transmit buffer (TXCIE)
       ISR(USART0_TXC_vect)
       {
          reactor::notify_from_isr(on_usart0_tx_complete);
