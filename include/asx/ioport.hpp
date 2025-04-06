@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <avr/io.h>
 
+#undef PinDef
+
 namespace asx
 {
    // Provide own traits to remove need for stdlib
@@ -314,7 +316,7 @@ namespace asx
             }
          }
 
-         inline auto set(const value_t value = value_t::high) -> void
+         inline auto set(const value_t value) -> void
          {
             if (value == value_t::high)
             {
