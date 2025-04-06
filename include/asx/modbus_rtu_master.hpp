@@ -157,7 +157,14 @@ namespace asx {
             );
 
             // Add reactor handler for the big timeout
-            Timer::react_on_overflow(reactor::bind(on_timeout_t40, reactor::prio::low));
+            Timer::react_on_overflow(
+               reactor::bind(on_timeout_t40)
+            );
+
+            // Add reactor handler for the Uart
+            Uart::react_on_character_received(
+               reactor::bind(on_char_received, reactor::prio::high)
+            );
 
             // Add a reactor handler for when the transmit is complete
             Uart::react_on_send_complete(
@@ -168,11 +175,6 @@ namespace asx {
                   },
                   reactor::prio::high
                )
-            );
-
-            // Add reactor handler for the Uart
-            Uart::react_on_character_received(
-               reactor::bind(on_char_received)
             );
 
             // Add a reactor to intiate the transmittion
