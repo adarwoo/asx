@@ -1,7 +1,7 @@
 .PHONY: clean all shell
 
 # Check if running inside Docker
-SWITCH_TO_DOCKER:=$(shell test -f /.dockerenv && echo no || echo yes)
+SWITCH_TO_DOCKER:=$(if $(wildcard /.dockerenv_asx),no,yes)
 
 # For AVR Studio, build
 ifdef ToolchainDir
@@ -52,7 +52,7 @@ CXX   ?= g++
 RC    ?= make/rc.py
 SIZE  ?= size
 ECHO  ?= echo
-MKDIR ?=	mkdir -p
+MKDIR ?= mkdir -p
 SREC_CAT ?= srec_cat
 
 BUILD_DIR       ?= $(build_type)
@@ -113,7 +113,7 @@ all : $(BUILDDIRS) $(BUILD_DIR)/$(BIN)$(BIN_EXT)
 -include $(RCDEP_FILES)
 
 # Create the build directory
-$(BUILD_DIR): ; $(MUTE)-mkdir -p $@
+$(BUILD_DIR): ; $(MUTE)$(MKDIR) $@
 
 $(BIN)$(BIN_EXT) : $(BUILD_DIR)/$(BIN)$(BIN_EXT)
 	@echo Copying $^ to $@
@@ -152,7 +152,7 @@ $(BUILD_DIR)/%.rcd : %.json
 #
 define CreateDir
   if [ ! -d $$dir ]; then \
-    (umask 002; mkdir -p $$dir); \
+    (umask 002; $(MKDIR) $$dir); \
   fi
 endef
 
