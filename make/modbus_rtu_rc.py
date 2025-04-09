@@ -35,7 +35,7 @@ The tuple is made of:
     generate a compile error.
 
    Finally, the name of the callback. This name must exists in the callbacks section.
-   The parameters are converted to the host reprentation and cast.
+   The parameters are converted to the host representation and cast.
    The size is checked during cast. A range 0-0x200 cannot be cast to an 8-bit.
 """
 import re
@@ -450,6 +450,9 @@ class Matcher:
             return False
 
         # Compare the `value` attribute
+        if type(self.value) != type(other.value):
+            return False
+
         if self.value != other.value:
             return False
 
