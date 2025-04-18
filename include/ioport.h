@@ -84,6 +84,9 @@ extern "C" {
 #define IOPORT_PORTB  1
 #define IOPORT_PORTC  2
 
+// Macros to use pin through VPORT_t
+#define VPORT_OUT_OFFSET    0x02  // Offset of OUT register in each VPORT
+
 /** \brief IOPORT pin directions */
 enum ioport_direction {
 	IOPORT_DIR_INPUT,  /*!< IOPORT input direction */
@@ -133,6 +136,22 @@ __always_inline static VPORT_t *arch_ioport_port_to_vbase(ioport_port_t port)
    (port * IOPORT_VPORT_OFFSET));
 }
 
+__always_inline static void ioport_set_pin(ioport_pin_t pin)
+{
+   ioport_port_t port = ioport_pin_to_port_id(pin);
+   VPORT_t *vport = arch_ioport_port_to_vbase(port);
+
+   vport->OUT |= (1 << ioport_pin_to_port_id(pin));
+}
+
+__always_inline static void ioport_clear_pin(ioport_pin_t pin)
+{
+   ioport_port_t port = ioport_pin_to_port_id(pin);
+   uint8_t bit = pin & 0x07;  // same as (pin % 8), but faster
+   VPORT_t *vport = arch_ioport_port_to_vbase(port);
+
+   vport->OUT &= ~(1 << bit);
+}
 
 __always_inline static PORT_t *ioport_pin_to_base(ioport_pin_t pin)
 {
