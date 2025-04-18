@@ -79,7 +79,7 @@ namespace asx {
                   Datagram::process_char(event.c);
                };
 
-               auto insert_pending_transmit = [] {
+               auto insert_pending_transmit = [](const auto& event, auto& sm, auto& deps, auto& subs) {
                   auto next = pending_transmits.pop();
 
                   if ( next != reactor::null ) {
@@ -90,29 +90,34 @@ namespace asx {
                      // Add the CRC
                      Datagram::ready_request();
 
-                     // Get the SM to move to RTS as we cannot transition from within an action
-                     react_on_ready_to_send.notify();
+                     // Transition to ready_to_send to insert the frame and turn off echo
+                     sm.process_event(rts{}, deps, subs);
                   }
                };
 
+               auto send = []() {
+                  Uart::disable_rx();
+                  Uart::send(Datagram::get_buffer());
+               };
+
                return make_transition_table(
-               * "cold"_s                + event<can_start>                     = "initial"_s
-               , "initial"_s             + on_entry<_>          / start_timers
-               , "initial"_s             + event<t35_timeout>                   = "idle"_s
-               , "initial"_s             + event<char_received> / start_timers
-               , "idle"_s                + on_entry<_>          / insert_pending_transmit
-               , "idle"_s                + event<check_pendings>/ insert_pending_transmit
-               , "idle"_s                + event<rts>                           = "sending"_s
-               , "idle"_s                + event<char_received>                 = "initial"_s
-               , "sending"_s             + event<frame_sent>    / wait_for_reply= "waiting_for_reply"_s
-               , "waiting_for_reply"_s   + event<reply_timeout> / timeout_error = "idle"_s
-               , "waiting_for_reply"_s   + event<char_received> / handle_char   = "reception"_s
-               , "reception"_s           + on_entry<_>          / stop_timeout
-               , "reception"_s           + event<char_received> / handle_char
-               , "reception"_s           + event<t15_timeout>                   = "control_and_waiting"_s
-               , "control_and_waiting"_s + event<char_received> / frame_error   = "idle"_s
-               , "control_and_waiting"_s + event<t35_timeout>   / process_reply = "prevent_race"_s
-               , "prevent_race"_s        + event<t40_timeout>                   = "idle"_s
+                  * "cold"_s                + event<can_start>                     = "initial"_s
+                  , "initial"_s             + on_entry<_>          / start_timers
+                  , "initial"_s             + event<t35_timeout>                   = "idle"_s
+                  , "initial"_s             + event<char_received> / start_timers
+                  , "idle"_s                + on_entry<_>          / insert_pending_transmit
+                  , "idle"_s                + event<check_pendings>/ insert_pending_transmit
+                  , "idle"_s                + event<rts>           / send          = "sending"_s
+                  , "idle"_s                + event<char_received>                 = "initial"_s
+                  , "sending"_s             + event<frame_sent>    / wait_for_reply= "waiting_for_reply"_s
+                  , "waiting_for_reply"_s   + event<reply_timeout> / timeout_error = "idle"_s
+                  , "waiting_for_reply"_s   + event<char_received> / handle_char   = "reception"_s
+                  , "reception"_s           + on_entry<_>          / stop_timeout
+                  , "reception"_s           + event<char_received> / handle_char
+                  , "reception"_s           + event<t15_timeout>                   = "control_and_waiting"_s
+                  , "control_and_waiting"_s + event<char_received> / frame_error   = "idle"_s
+                  , "control_and_waiting"_s + event<t35_timeout>   / process_reply = "prevent_race"_s
+                  , "prevent_race"_s        + event<t40_timeout>                   = "idle"_s
                );
             }
          };
@@ -130,16 +135,7 @@ namespace asx {
          }
 
          static void on_timeout() {
-            trace("TIMEOUT");
             sm.process_event(reply_timeout{});
-         }
-
-         static void on_ready_to_send() {
-            // Turn off the receiver (the RS285 and single wire echo's what we're sending
-            // We don't check - so turn off
-            Uart::disable_rx();
-            Uart::send(Datagram::get_buffer());
-            sm.process_event(rts{});
          }
 
       public:
@@ -177,9 +173,6 @@ namespace asx {
                )
             );
 
-            // Add a reactor to intiate the transmittion
-            react_on_ready_to_send = reactor::bind(on_ready_to_send);
-
             // React on timeout
             react_on_reply_timeout = reactor::bind(on_timeout);
 
@@ -209,6 +202,11 @@ namespace asx {
          static void request_to_send(reactor::Handle h) {
             pending_transmits.append(h);
             sm.process_event(check_pendings{});
+         }
+
+         /// @return The pending request mask
+         static reactor::Mask get_pending_request() {
+            return pending_transmits;
          }
       };
 
