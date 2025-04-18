@@ -13,6 +13,9 @@
  * Additional timer service is added to the reactors
  * @author software@arreckx.com
  */
+#include <type_traits>
+#include <functional>
+
 #include <reactor.h>
 #include <trace.h>
 
@@ -25,6 +28,75 @@ namespace asx {
          low,
          high
       };
+
+      namespace detail {
+         template <typename T>
+         concept EightBit = sizeof(std::remove_cvref_t<T>) == 1;
+
+         template <EightBit A, EightBit B>
+         constexpr void* pack(A a, B b) {
+             uint16_t result = (static_cast<uint16_t>(b) << 8) | static_cast<uint16_t>(a);
+             return reinterpret_cast<void*>(static_cast<uintptr_t>(result));
+         }
+
+         template <EightBit A, EightBit B>
+         constexpr void unpack(void *_packed, A& out_a, B& out_b) {
+            uint16_t packed = reinterpret_cast<uint16_t>(_packed);
+            out_a = static_cast<A>(packed & 0xFF);
+            out_b = static_cast<B>((packed >> 8) & 0xFF);
+         }
+
+         //
+         // Helper type trait to check the number of arguments and access argument types
+         //
+         template <typename T>
+         struct function_traits;
+
+         template <typename Ret, typename... Args>
+         struct function_traits<Ret(Args...)> {
+            static constexpr std::size_t arity = sizeof...(Args);
+
+            template <std::size_t N>
+            struct arg {
+               static_assert(N < arity, "Index out of bounds");
+               using type = typename std::tuple_element<N, std::tuple<Args...>>::type;
+            };
+         };
+
+         template <typename Ret, typename... Args>
+         struct function_traits<Ret(*)(Args...)> : function_traits<Ret(Args...)> {};
+
+         template <typename Ret, typename... Args>
+         struct function_traits<Ret(&)(Args...)> : function_traits<Ret(Args...)> {};
+
+         template <typename ClassType, typename Ret, typename... Args>
+         struct function_traits<Ret(ClassType::*)(Args...)> : function_traits<Ret(Args...)> {};
+
+         template <typename ClassType, typename Ret, typename... Args>
+         struct function_traits<Ret(ClassType::*)(Args...) const> : function_traits<Ret(Args...)> {};
+
+         template <typename F>
+         struct function_traits : function_traits<decltype(&F::operator())> {};
+
+         // Trampoline template for functions with 2 arguments
+         template <typename Func>
+         struct Trampoline {
+            static Func func;
+
+            static void call(void* context) {
+               uint8_t a, b;
+               unpack(context, a, b);
+
+               func(
+                  static_cast<typename function_traits<Func>::template arg<0>::type>(a),
+                  static_cast<typename function_traits<Func>::template arg<1>::type>(b)
+               );
+            }
+         };
+
+         template <typename Func>
+         Func Trampoline<Func>::func;
+      }
 
       ///< Shortcut for the C++ handle
       using Handler = reactor_handler_t;
@@ -82,8 +154,7 @@ namespace asx {
          // Notify function for two arguments, packing them into a single 32-bit value
          template <typename T1, typename T2>
          inline void notify(T1 arg1, T2 arg2) {
-            uint32_t packed = pack(static_cast<uint8_t>(arg1), static_cast<uint8_t>(arg2));
-            reactor_notify(handle, reinterpret_cast<void*>(static_cast<uintptr_t>(packed)));
+            reactor_notify(handle, detail::pack(arg1, arg2));
          }
 
          // Invoke (direct call of the handler) no arg
@@ -94,14 +165,13 @@ namespace asx {
          // Notify function for one argument
          template <typename T>
          inline void invoke(T arg) {
-            reactor_invoke(handle, reinterpret_cast<void*>(static_cast<uintptr_t>(arg)));
+            reactor_invoke(handle, static_cast<uintptr_t>(arg));
          }
 
          // Notify function for two arguments, packing them into a single 32-bit value
          template <typename T1, typename T2>
          inline void invoke(T1 arg1, T2 arg2) {
-            uint32_t packed = pack(static_cast<uint8_t>(arg1), static_cast<uint8_t>(arg2));
-            reactor_invoke(handle, reinterpret_cast<void*>(static_cast<uintptr_t>(packed)));
+            reactor_invoke(handle, detail::pack(arg1, arg2));
          }
 
          // Notify in the future
@@ -175,19 +245,13 @@ namespace asx {
                reinterpret_cast<void*>(static_cast<uintptr_t>(arg))
             );
          }
-
-      private:
-         // Helper function to pack two 16-bit values into a single 32-bit integer
-         constexpr uint16_t pack(uint8_t a, uint8_t b) {
-            return (static_cast<uint16_t>(a) << 8) | static_cast<uint16_t>(b);
-         }
       };
 
       ///< Shortcut for the C++ mask
       class Mask {
          reactor_mask_t mask;
 
-      public:         
+      public:
          // Constructor to initialize handle
          explicit Mask() : mask(0) {}
 
@@ -216,18 +280,36 @@ namespace asx {
          void append(const Mask m) {
             mask |= m.mask;
          }
+
+         /// @brief Check pending handles
+         bool is_empty() {
+            return mask == 0;
+         }
       };
 
-      template <typename Func>
-      static constexpr auto bind(Func func, prio p = prio::low) -> Handle {
-         // Convert the func to a void(void)
+      // Register handler function
+      template <typename F>
+      std::enable_if_t<detail::function_traits<std::decay_t<F>>::arity <= 1, Handle>
+      bind(F&& func, reactor_priority_t p = prio::low) {
          using vv = void(*)();
          auto pv = (vv)func;
-
          return Handle(
             reactor_register(
-               (reactor_handler_t)(pv),
-               (reactor_priority_t)p
+                  reinterpret_cast<reactor_handler_t>(pv),
+                  static_cast<reactor_priority_t>(p)
+            )
+         );
+      }
+
+      template <typename F>
+      std::enable_if_t<detail::function_traits<std::decay_t<F>>::arity == 2, Handle>
+      bind(F&& func, reactor_priority_t p = prio::low) {
+         using Func = std::decay_t<F>;
+         detail::Trampoline<Func>::func = func;
+         return Handle(
+            reactor_register(
+                  reinterpret_cast<reactor_handler_t>(detail::Trampoline<Func>::call),
+                  static_cast<reactor_priority_t>(p)
             )
          );
       }
@@ -242,9 +324,13 @@ namespace asx {
          return Mask(m);
       }
 
-      static inline void clear(Mask m) { reactor_clear(m); }
+      static inline void clear(Mask m) {
+         reactor_clear(m);
+      }
 
-      static inline void notify_from_isr(Handle on_xx) { reactor_null_notify_from_isr(on_xx); }
+      static inline void notify_from_isr(Handle on_xx) {
+         reactor_null_notify_from_isr(on_xx);
+      }
 
       // Yield - no arg
       inline void yield() {
@@ -260,15 +346,8 @@ namespace asx {
       // Yield 2 args
       template <typename T1, typename T2>
       inline void yield(T1 arg1, T2 arg2) {
-         // Helper function to pack two 16-bit values into a single 32-bit integer
-         constexpr auto pack = [](uint8_t a, uint8_t b) -> uint16_t {
-            return (static_cast<uint16_t>(a) << 8) | static_cast<uint16_t>(b);
-         };
-
-         uint32_t packed = pack(static_cast<uint8_t>(arg1), static_cast<uint8_t>(arg2));
-         reactor_yield(reinterpret_cast<void*>(static_cast<uintptr_t>(packed)));
+         reactor_yield(detail::pack(arg1, arg2));
       }
-
 
       static inline void run() { reactor_run(); }
    }
