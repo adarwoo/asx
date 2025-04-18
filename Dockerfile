@@ -45,6 +45,9 @@ RUN set -xe \
   && cd /opt/ATtiny_DFP.2.0.368 \
   && unzip /tmp/dfp.zip
 
+# Install a native compiler - same version as the cross compiler for simulation
+
+
 # Add the path for all processes
 ENV PATH='PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/avr-gcc/bin'
 
@@ -55,11 +58,6 @@ RUN set -xe \
 # Setting the command to launch
 CMD ["bash", "-l"]
 
-# Get Polaris
+# Add a marker file for make to detect
 RUN set -xe \
-  && cd /opt \
-  && wget https://wabtec-test.cop.blackduck.com/api/tools/v2/downloads/polaris_cli-linux64-2024.12.0.zip \
-  && unzip polaris_cli-linux64-2024.12.0.zip \
-  && ln -s polaris_cli-linux64-2024.12.0 polaris \
-  && echo 'PATH=$PATH:/opt/polaris/bin' >> /etc/bash.bashrc \
-  && rm polaris_cli-linux64-2024.12.0.zip
+   && touch /.dockerenv_asx

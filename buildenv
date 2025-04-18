@@ -31,6 +31,8 @@ fi
 base_opts="-u $(id -u $USER):$(getent group docker | cut -d: -f3) -v ${mountdir}:${mountdir}"
 workdir="$(realpath $(pwd))"
 
+[ -n "$SIM" ] && env_opt+="-e SIM=1"
+
 # Name the runtime container uniquely
 container_name="ASX_$(id -u)_$(date +%Y%m%d-%H%M%S)"
 
@@ -51,7 +53,7 @@ fi
 # Run make or start a shell
 if [[ $1 == "make" ]]; then
    shift
-   docker run ${USE_TTY} --rm --init --name $container_name -h $hostname_ $base_opts -w $workdir $image make -j$core_count $@
+   docker run ${USE_TTY} --rm --init --name $container_name $env_opt -h $hostname_ $base_opts -w $workdir $image make -j$core_count $@
 else
-   docker run ${USE_TTY} --rm --init --name $container_name $xoptions -h $hostname_ $base_opts -w $workdir $image $@
+   docker run ${USE_TTY} --rm --init --name $container_name $env_opt $xoptions -h $hostname_ $base_opts -w $workdir $image $@
 fi
