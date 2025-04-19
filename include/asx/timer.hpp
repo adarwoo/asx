@@ -5,7 +5,10 @@
  */
 #pragma once
 
+#include <type_traits>
+
 #include <timer.h>
+
 #include <asx/chrono.hpp>
 #include <asx/reactor.hpp>
 
@@ -36,7 +39,34 @@ namespace asx {
          static timer_count_t to_timer_count(time_point tp) {
             return static_cast<timer_count_t>(tp.time_since_epoch().count());
          }
+         
+         static duration abs_distance(time_point a, time_point b) {
+            using signed_timer_count_t = std::make_signed<timer_count_t>::type;
+
+            timer_count_t a_count = timer::steady_clock::to_timer_count(a);
+            timer_count_t b_count = timer::steady_clock::to_timer_count(b);
+
+            // Signed difference, handles wraparound
+            signed_timer_count_t diff = static_cast<signed_timer_count_t>(a_count - b_count);
+
+            // Take absolute value (no UB since diff is signed)
+            if (diff < 0) diff = -diff;
+
+            return timer::steady_clock::duration(static_cast<timer_count_t>(diff));
+         }
       };
+
+      // Overload the lt operator to account for the roll over      
+      inline bool operator<(steady_clock::time_point lhs, steady_clock::time_point rhs) {
+         using rep = steady_clock::rep;
+         using signed_rep = std::make_signed<rep>::type;
+
+         auto lhs_raw = steady_clock::to_timer_count(lhs);
+         auto rhs_raw = steady_clock::to_timer_count(rhs);
+
+         return static_cast<signed_rep>(lhs_raw - rhs_raw) < 0;
+      }
+      
 
       ///< Shortcut for the C++ handle
       class Instance {
