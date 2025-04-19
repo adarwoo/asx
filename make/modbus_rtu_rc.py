@@ -754,7 +754,7 @@ class State:
         if self.pos == 1 and self.mode == "master":
             retval += f"{tab}{INDENT}".join(["",
                 "// The command must match the command just sent\n",
-                "if ( (c & 0x80) && (c != (0x80 | buffer[1])) ) {\n",
+                "if ( c == (0x80 | buffer[1]) ) { // Bit 7 indicate an error\n",
                 "   state = state_t::BAD_REQUEST;\n",
                 "   break;\n",
                 "} else if ( c != buffer[1] ) {\n",
