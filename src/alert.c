@@ -54,9 +54,11 @@ void alert_record( bool doAbort, int line, const char *file )
 {
    cli();
 
+   #ifdef DEBUG
    // Write the alert in the trace
    const char *last_slash = strrchr(file, '/'); // Find the last '/'
    trace("ALERT!%u %s", line, (last_slash) ? last_slash + 1 : file);
+   #endif
 
    // Dump to the debug pin
    #ifdef ALERT_OUTPUT_PIN
