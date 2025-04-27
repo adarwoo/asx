@@ -41,7 +41,12 @@ namespace asx {
                auto start_timer = [] () { Timer::start(); };
                auto reset       = [] () { Datagram::reset(); };
                auto ready_reply = [] () { Datagram::ready_reply(); };
-               auto reply       = [] () { Uart::send(Datagram::get_buffer()); };
+               auto listen      = [] () { Uart::enable_rx(); }; // Ready to receive again
+
+               auto reply       = [] () {
+                  Uart::disable_rx();
+                  Uart::send(Datagram::get_buffer());
+               };
 
                auto handle_char = [] (const auto& event) {
                   Timer::start(); // Restart the timers (15/35/40)
@@ -65,7 +70,7 @@ namespace asx {
                , "reply"_s               + event<t40_timeout> [broadcast]                = "idle"_s    // In broadcast - no answer
                , "reply"_s               + event<t40_timeout>                            = "emission"_s
                , "emission"_s            + on_entry<_>                     / reply
-               , "emission"_s            + event<frame_sent>                             = "initial"_s
+               , "emission"_s            + event<frame_sent>               / listen      = "initial"_s
                );
             }
          };
