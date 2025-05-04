@@ -42,7 +42,7 @@ namespace asx
       }
 
       // AVR bitshift requires n iteration
-      static inline const std::array<uint8_t, 8> bits_mask{
+      static inline constexpr std::array<uint8_t, 8> bits_mask{
           0b01111111,
           0b00111111,
           0b00011111,
@@ -56,19 +56,24 @@ namespace asx
       // An internal queue of the max number of pages is created
       void Operation::request_operation()
       {
-         operations.push(static_cast<Operation *>(this));
+         // Request an operation, but don't overflow the queue
+         operations.push_unique(this);
 
          // Activate the interrupt
-         // If the eeprom is aleady available, the interrupt will fire right away
+         // If the eeprom is already available, the interrupt will fire right away
          // Otherwise, the reactor will claim that time for other use and the interrupt will
          //  fire to indicate it is ready to accept more operations.
          NVMCTRL.INTCTRL |= NVMCTRL_EEREADY_bm;
       }
 
       // Reactor handler
-      void Operation::on_eeprom_ready()
-      {
-         operations.pop()->do_operation();
+      void Operation::on_eeprom_ready() {
+         if ( not operations.empty() ) {
+            operations.pop()->do_operation();
+
+            // Activate the interrupt - so any pending request are handled right after
+            NVMCTRL.INTCTRL |= NVMCTRL_EEREADY_bm;
+         }
       }
 
       Counter::Counter(uint8_t PAGE) : counter{0}, page{PAGE}, bankpos{0xff}, bitpos{0}, bytepos{0}
@@ -113,7 +118,7 @@ namespace asx
                   counter += 8;
                   continue;
                }
-               
+
                if (value != 0xff)
                {
                   for (bitpos = 0; bitpos < 8; ++bitpos)
@@ -135,11 +140,11 @@ namespace asx
                      write_page(page);
                   }
                }
-               
+
                break;
-            }               
+            }
          }
-         
+
          if (bytepos == bytes_in_bank )
          {
             // The previous bank is full
@@ -219,7 +224,10 @@ ISR(NVMCTRL_EE_vect)
 {
    // This is a level interrupt - unless disabled, it will be called again an again
    NVMCTRL.INTCTRL = 0;
+
    // Clear the flag
    NVMCTRL.INTFLAGS = NVMCTRL_EEREADY_bm;
+
+   // Invoke the reactor
    asx::eeprom::react_on_eeprom_ready();
 }
