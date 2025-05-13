@@ -231,6 +231,11 @@ namespace asx
 
       public:
          constexpr PinDef(const Port port, const uint8_t pin) : port_pin((port.index() * 8U) + pin) {}
+            
+         constexpr PinDef(const PinDef& copy) : port_pin(copy.port_pin) {}
+            
+         constexpr PinDef(const port_pin_t pp) : port_pin(pp) {}
+            
 
          inline constexpr Port port() const
          {
@@ -263,6 +268,10 @@ namespace asx
          inline constexpr mask_t mask() const
          {
             return 1U << (port_pin & 0x07);
+         }
+         
+         inline constexpr port_pin_t integral() const {
+            return port_pin;
          }
       };
 
