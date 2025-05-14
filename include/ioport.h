@@ -71,7 +71,7 @@ extern "C" {
  * \param pin IOPORT zero-based index of the I/O pin
  */
 #define IOPORT_CREATE_PIN(port, pin) ((IOPORT_ ## port) * 8 + (pin))
-#define PinDef(portDigit, pin) IOPORT_CREATE_PIN(PORT ## portDigit, pin)
+#define IOPORT(portDigit, pin) IOPORT_CREATE_PIN(PORT ## portDigit, pin)
 #ifdef SIM
 #define IOPORT_BASE_ADDRESS SIM_OFFSET(0x400)
 #else
