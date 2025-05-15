@@ -239,7 +239,7 @@ namespace asx {
 
          // Initialization
          template <typename... T>
-         inline constexpr PinDef& init(T... args) {
+         static inline constexpr void init(T... args) {
             constexpr bool has_value = (traits::is_same_v<T, value_t> || ...);
 
             if constexpr (has_value) {
@@ -259,8 +259,6 @@ namespace asx {
                register8_t* pinctrl = &(PortDef::base()->PIN0CTRL) + PIN_NUMBER;
                *pinctrl = pinctrl_value;
             }
-
-            return *this;
          }
       };
 
