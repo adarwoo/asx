@@ -204,7 +204,7 @@ namespace asx {
          static constexpr uint8_t pin() { return PIN_NUMBER; }
          static constexpr uint8_t mask() { return 1U << PIN_NUMBER; }
 
-         static constexpr void set(bool value = true) {
+         static inline constexpr void set(bool value = true) {
             if (value) {
                asm volatile("sbi %0, %1" : : "I"(&PortDef::vbase()->OUT), "I"(PIN_NUMBER));
             } else {
@@ -212,15 +212,15 @@ namespace asx {
             }
          }
 
-         static constexpr void clear() {
+         static inline constexpr void clear() {
             asm volatile("cbi %0, %1" : : "I"(&PortDef::vbase()->OUT), "I"(PIN_NUMBER));
          }
 
-         static constexpr void toggle() {
+         static inline constexpr void toggle() {
             asm volatile("sbi %0, %1" : : "I"(&PortDef::vbase()->OUTTGL), "I"(PIN_NUMBER));
          }
 
-         static constexpr bool get() {
+         static inline constexpr bool get() {
             return PortDef::vbase()->IN & mask();
          }
 
@@ -264,7 +264,7 @@ namespace asx {
 
       // Helper function to create a PinDef compatible with a macro definition
       #define IOPORT(PORTDEF, PIN) \
-         asx::ioport::Pin(PORTDEF, PIN)
+         asx::ioport::PinDef<PORTDEF, PIN>{}
 
       class Pin {
       public:
@@ -370,7 +370,7 @@ namespace asx {
             return vbase()->IN & mask();
          }
 
-         inline auto set(bool value) -> void {
+         inline auto set(bool value=true) -> void {
             if (value) {
                vbase()->OUT |= mask();
             } else {
