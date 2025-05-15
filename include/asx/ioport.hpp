@@ -21,46 +21,90 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+/**
+ * @file ioport.hpp
+ * @brief C++ ioport service for AVR microcontrollers
+ * @details
+ * This file provides a C++ interface for the ioport service, allowing
+ * for easy configuration and control of GPIO pins.
+ * It includes features such as setting pin direction, level, and
+ * configuring pull-up resistors, sense modes, and inversion.
+ * The implementation is designed to be efficient and easy to use,
+ * leveraging C++ features like templates and constexpr for compile-time
+ * evaluation.
+ *
+ * The library allows for managing ports and pins in 2 different ways:
+ * 1. Using the PortDef and PinDef classes for compile-time configuration.
+ * 2. Using the Port and Pin classes for run-time configuration.
+ * Note: The PinDef and PortDef classes are RValue-only and do not
+ *       carry any data. They are used for compile-time evaluation.
+ *       The Pin and Port classes are data-carrying classes that can
+ *       be constructed from PortDef and PinDef respectively, as well as
+ *       passed in functions.
+ *
+ * Note: The MACRO IOPORT is also used by the C library to define IOPORT pins.
+ *       When defining a pin using the IOPORT macro, the pin can be used from
+ *       either C or C++.
+ * For C++, the namespace asx::ioport must be used and the pins can be defined
+ * in a heaader as constexpr variables.
+ *
+ * Warning: This code will not compile if the optimization level is set to -O0.
+ * Even with -Og or -O1, the code will be optimized to a single instruction.
+ *
+ * The init() method of the Pin class can be used to configure the pin in one
+ * go, similar to the device tree configuration.
+ * The pin options available are:
+ * - Initial value        : value_t::high, value_t::low
+ * - Direction of the pin : dir_t::in, dir_t::out
+ * - Pull-up resistor     : pullup::enabled, pullup::disabled
+ * - Sense mode           : sense::rising, sense::falling, sense::bothedges, sense::level_low
+ * - Inversion            : invert::normal, invert::inverted
+ *
+ * Example usage:
+ * @code
+ * #include "ioport.hpp"
+ *
+ * using namespace asx::ioport;
+ *
+ * // Define a pin using the PinDef template
+ * using MyPin = PinDef<A, 0>; // As a type
+ * constexpr auto my_pin = PinDef<C, 5>{}; // As a variable
+ *
+ * // Alternatively, you can use the IOPORT macro to define a pin as a variable
+ * #define OTHER_PIN IOPORT(A, 0)
+ *
+ * // Set the pin direction to output
+ * MyPin::set_dir(dir_t::out);
+ * my_pin.set_dir(dir_t::out);
+ * OTHER_PIN.set_dir(dir_t::out);
+ *
+ * // Yeilds a single machine instruction
+ *
+ * // For run time configuration, use the Port and Pin classes
+ * Port port{A}; // Create a Port object for port A
+ * Pin pin{A, 0}; // Create a Pin object for pin A0
+ * // The Pin object is only 1 byte and can be passed around
+ * // Set the pin direction to output (same API as above)
+ * pin.set_dir(dir_t::out);
+ *
+ * // Pins can be configured with options like in device tree
+ * pin.init(dir_t::in, pullup::enabled, sense::rising);
+ * pin.init(dir_t::out, sense::rising, invert::inverted);
+ *
+ * </code>
+ * @author software@arreckx.com
+ */
+
 #include <cstdint>
+#include <type_traits>
+
 #include <avr/io.h>
 
-#undef Pin
-
 namespace asx {
-   // Provide own traits to remove need for stdlib
-   namespace traits {
-      template <typename Base, typename Derived>
-      concept is_base_of = requires(Derived *d) {
-         { static_cast<Base *>(d) };
-      };
-
-      template <typename Base, typename Derived>
-      inline constexpr bool is_base_of_v = is_base_of<Base, Derived>;
-
-      template <class T, T V>
-      struct integral_constant {
-         using type = integral_constant;
-         static constexpr T value = V;
-      };
-
-      using true_type = integral_constant<bool, true>;
-      using false_type = integral_constant<bool, false>;
-
-      template <class, class>
-      struct is_same : false_type  {};
-
-      template <class T>
-      struct is_same<T, T> : true_type {};
-
-      template <typename T1, typename T2>
-      inline constexpr bool is_same_v = is_same<T1, T2>::value;
-   }
-
    namespace ioport {
       enum class dir_t : uint8_t {
          in = 0,
-         out = 1,
-         configured = 2
+         out = 1
       };
 
       enum class value_t : uint8_t{
@@ -115,24 +159,19 @@ namespace asx {
          static constexpr pullup_t enabled{PORT_PULLUPEN_bm};
       }
 
-      enum class slewrate_limit : uint8_t {
-         disabled = 0,
-         enabled = 1
-      };
-
       namespace aux {
          // Compute PINCTRL register value by summing options that inherit from pinctrl_t
          template <typename... OPTS>
-         static constexpr uint8_t compute_pinctrl() {
+         static constexpr uint8_t compute_pinctrl(OPTS... opts) {
             uint8_t result = 0;
-            ((result |= static_cast<uint8_t>(traits::is_base_of_v<pinctrl_t, OPTS> ? OPTS::value : 0)), ...);
+            ((result |= static_cast<uint8_t>(std::is_base_of_v<pinctrl_t, OPTS> ? static_cast<uint8_t>(opts) : 0)), ...);
             return result;
          }
 
          // Extract argument helper
          template <typename Target, typename First, typename... Rest>
          constexpr Target extract_argument(First first, Rest... rest) {
-            if constexpr (traits::is_same_v<First, Target>) {
+            if constexpr (std::is_same_v<First, Target>) {
                return first; // Found the value
             } else {
                return extract_argument<Target>(rest...); // Recurse
@@ -146,17 +185,17 @@ namespace asx {
       // ----------------------------------------------------------------------
       template <uint8_t PORT_INDEX>
       struct PortDef {
-         static constexpr uint8_t index() { return PORT_INDEX; }
+         inline static constexpr uint8_t index() { return PORT_INDEX; }
 
-         static constexpr PORT_t* base() {
+         inline static constexpr PORT_t* base() {
             return reinterpret_cast<PORT_t*>(0x400 + (PORT_INDEX * 0x20));
          }
 
-         static constexpr VPORT_t* vbase() {
+         inline static constexpr VPORT_t* vbase() {
             return reinterpret_cast<VPORT_t*>(0x0000 + (PORT_INDEX * 0x04));
          }
 
-         static constexpr void set_slewrate(bool enabled) {
+         inline static constexpr void set_slewrate(bool enabled) {
             if (enabled) {
                base()->PORTCTRL |= 1;
             } else {
@@ -199,29 +238,38 @@ namespace asx {
       // ----------------------------------------------------------------------
       // PinDef: Rvalue-only, no data, static methods
       // ----------------------------------------------------------------------
-      template <typename PortDef, uint8_t PIN_NUMBER>
+      template <typename PORTDEF, uint8_t PIN_NUMBER>
       struct PinDef {
-         static constexpr uint8_t pin() { return PIN_NUMBER; }
-         static constexpr uint8_t mask() { return 1U << PIN_NUMBER; }
+         using PortDef = PORTDEF;
+         inline static constexpr uint8_t pin() { return PIN_NUMBER; }
+         inline static constexpr uint8_t mask() { return 1U << PIN_NUMBER; }
 
-         static inline constexpr void set(bool value = true) {
-            if (value) {
-               asm volatile("sbi %0, %1" : : "I"(&PortDef::vbase()->OUT), "I"(PIN_NUMBER));
+         inline static constexpr void set(value_t value = value_t::high) {
+            if (value == value_t::high) {
+               asm volatile("sbi %0, %1" : : "I"(&PORTDEF::vbase()->OUT), "I"(PIN_NUMBER));
             } else {
-               asm volatile("cbi %0, %1" : : "I"(&PortDef::vbase()->OUT), "I"(PIN_NUMBER));
+               asm volatile("cbi %0, %1" : : "I"(&PORTDEF::vbase()->OUT), "I"(PIN_NUMBER));
+            }
+         }
+
+         inline static constexpr void set(bool value = true) {
+            if (value) {
+               asm volatile("sbi %0, %1" : : "I"(&PORTDEF::vbase()->OUT), "I"(PIN_NUMBER));
+            } else {
+               asm volatile("cbi %0, %1" : : "I"(&PORTDEF::vbase()->OUT), "I"(PIN_NUMBER));
             }
          }
 
          static inline constexpr void clear() {
-            asm volatile("cbi %0, %1" : : "I"(&PortDef::vbase()->OUT), "I"(PIN_NUMBER));
+            asm volatile("cbi %0, %1" : : "I"(&PORTDEF::vbase()->OUT), "I"(PIN_NUMBER));
          }
 
          static inline constexpr void toggle() {
-            asm volatile("sbi %0, %1" : : "I"(&PortDef::vbase()->OUTTGL), "I"(PIN_NUMBER));
+            asm volatile("sbi %0, %1" : : "I"(&PORTDEF::vbase()->OUTTGL), "I"(PIN_NUMBER));
          }
 
          static inline constexpr bool get() {
-            return PortDef::vbase()->IN & mask();
+            return PORTDEF::vbase()->IN & mask();
          }
 
          // Add operator*() to behave like get()
@@ -231,61 +279,54 @@ namespace asx {
 
          static constexpr void set_dir(const dir_t dir) {
             if (dir == dir_t::in) {
-               asm volatile("sbi %0, %1" : : "I"(&PortDef::vbase()->DIR), "I"(PIN_NUMBER));
+               asm volatile("sbi %0, %1" : : "I"(&PORTDEF::vbase()->DIR), "I"(PIN_NUMBER));
             } else {
-               asm volatile("cbi %0, %1" : : "I"(&PortDef::vbase()->DIR), "I"(PIN_NUMBER));
+               asm volatile("cbi %0, %1" : : "I"(&PORTDEF::vbase()->DIR), "I"(PIN_NUMBER));
             }
          }
 
          // Initialization
          template <typename... T>
          static inline constexpr void init(T... args) {
-            constexpr bool has_value = (traits::is_same_v<T, value_t> || ...);
+            constexpr bool has_value = (std::is_same_v<T, value_t> || ...);
 
             if constexpr (has_value) {
-               set(extract_argument<value_t>(args...));
+               set(aux::extract_argument<value_t>(args...));
             }
 
-            constexpr bool has_dir = (traits::is_same_v<T, dir_t> || ...);
+            constexpr bool has_dir = (std::is_same_v<T, dir_t> || ...);
 
             if constexpr (has_dir) {
-               set_dir(extract_argument<dir_t>(args...));
+               set_dir(aux::extract_argument<dir_t>(args...));
             }
 
             // Compute the PINCTRL register value
-            uint8_t pinctrl_value = aux::compute_pinctrl();
+            uint8_t pinctrl_value = aux::compute_pinctrl<T...>(args...);
 
             if (pinctrl_value != 0) {
-               register8_t* pinctrl = &(PortDef::base()->PIN0CTRL) + PIN_NUMBER;
+               register8_t* pinctrl = &(PORTDEF::base()->PIN0CTRL) + PIN_NUMBER;
                *pinctrl = pinctrl_value;
             }
          }
       };
 
-      // Helper function to create a PinDef compatible with a macro definition
-      #define IOPORT(PORTDEF, PIN) \
-         asx::ioport::PinDef<PORTDEF, PIN>{}
-
       class Pin {
       public:
-         using portpin_t = uint8_t;
          using mask_t = uint8_t;
 
       private:
-         portpin_t port_pin;
+         uint8_t port_pin;
 
       public:
          // Constructors
          constexpr Pin(const Port port, const uint8_t pin) : port_pin((port.index() * 8U) + pin) {}
 
          template <typename PinDef>
-         constexpr Pin(PinDef) : port_pin( PinDef::PortDef::index() << 3 & PinDef::pin() ) {}
+         constexpr Pin(PinDef) : port_pin( PinDef::PortDef::index() * 8U + PinDef::pin() ) {}
 
          constexpr Pin(const Pin& copy) : port_pin(copy.port_pin) {}
 
          constexpr Pin(Pin&& rvalue) : port_pin(rvalue.port_pin) {}
-
-         constexpr Pin(const portpin_t pp) : port_pin(pp) {}
 
          // Assignment Operators
          constexpr Pin& operator=(const Pin& copy) {
@@ -298,21 +339,16 @@ namespace asx {
             return *this;
          }
 
-         constexpr Pin& operator=(const portpin_t pp) {
-            port_pin = pp;
-            return *this;
-         }
-
          // Initialization
          template <typename... T>
          inline constexpr Pin& init(T... args) {
-            constexpr bool has_value = (traits::is_same_v<T, value_t> || ...);
+            constexpr bool has_value = (std::is_same_v<T, value_t> || ...);
 
             if constexpr (has_value) {
                set(aux::extract_argument<value_t>(args...));
             }
 
-            constexpr bool has_dir = (traits::is_same_v<T, dir_t> || ...);
+            constexpr bool has_dir = (std::is_same_v<T, dir_t> || ...);
 
             if constexpr (has_dir) {
                set_dir(aux::extract_argument<dir_t>(args...));
@@ -341,10 +377,6 @@ namespace asx {
 
          inline constexpr mask_t mask() const {
             return 1U << pin();
-         }
-
-         inline constexpr portpin_t integral() const {
-            return port_pin;
          }
 
 #ifdef SIM
@@ -404,9 +436,19 @@ namespace asx {
       };
 
       // Actual ports - rvalue only
-      constexpr auto A = PortDef<0>{};
-      constexpr auto B = PortDef<1>{};
-      constexpr auto C = PortDef<2>{};
-
+      using A = PortDef<0>;
+      using B = PortDef<1>;
+      using C = PortDef<2>;
    } // namespace ioport
 }
+
+#undef IOPORT
+
+// Helper function to create a PinDef compatible with a macro definition
+#define ASX_IOPORT_A asx::ioport::A
+#define ASX_IOPORT_B asx::ioport::B
+#define ASX_IOPORT_C asx::ioport::C
+
+// Actual macro that uses token pasting
+#define IOPORT(PORTDEF, PIN) \
+   asx::ioport::PinDef<ASX_IOPORT_ ## PORTDEF, PIN>{}
