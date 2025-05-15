@@ -338,6 +338,15 @@ namespace asx {
          }
       };
 
+
+      /**
+       * @brief Pin class for runtime pin manipulation
+       * @details
+       * The Pin class can be used in a similar way to the PinDef class, but
+       * can be constructed at runtime.
+       * Note: The Pin cannot be construction uninitialized as this would result in
+       *       undefined behavior.
+       */
       class Pin {
       public:
          using mask_t = uint8_t;
@@ -351,6 +360,9 @@ namespace asx {
 
          template <typename PinDef>
          constexpr Pin(PinDef) : port_pin( PinDef::PortDef::index() * 8U + PinDef::pin() ) {}
+
+         // Delete the default constructor to prevent uninitialized Pins
+         Pin() = delete;
 
          constexpr Pin(const Pin& copy) : port_pin(copy.port_pin) {}
 
