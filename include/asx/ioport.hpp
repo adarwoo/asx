@@ -159,6 +159,11 @@ namespace asx {
          static constexpr pullup_t enabled{PORT_PULLUPEN_bm};
       }
 
+      // Forward declaration of PinDef
+      // This is needed to allow the use of PinDef in the init_impl function
+      template <typename PORTDEF, uint8_t PIN_NUMBER>
+      struct PinDef;
+
       namespace aux {
          // Compute PINCTRL register value by summing options that inherit from pinctrl_t
          template <typename... OPTS>
@@ -176,6 +181,33 @@ namespace asx {
             } else {
                return extract_argument<Target>(rest...); // Recurse
             }
+         }
+
+         template <typename PORTDEF, uint8_t PIN_NUMBER, typename... T>
+         static inline constexpr void init_impl(PORTDEF, uint8_t pin_number, T... args) {
+             constexpr bool has_value = (std::is_same_v<T, value_t> || ...);
+
+             if constexpr (has_value) {
+                 PinDef<PORTDEF, PIN_NUMBER>::set(extract_argument<value_t>(args...));
+             }
+
+             constexpr bool has_dir = (std::is_same_v<T, dir_t> || ...);
+
+             if constexpr (has_dir) {
+                 PinDef<PORTDEF, PIN_NUMBER>::set_dir(extract_argument<dir_t>(args...));
+             }
+
+             // Check if any argument contributes to the PINCTRL register
+             constexpr bool has_pinctrl = (std::is_base_of_v<pinctrl_t, T> || ...);
+
+             if constexpr (has_pinctrl) {
+                 // Compute the PINCTRL register value
+                 uint8_t pinctrl_value = compute_pinctrl(args...);
+                 if (pinctrl_value != 0) {
+                     register8_t* pinctrl = &(PORTDEF::base()->PIN0CTRL) + pin_number;
+                     *pinctrl = pinctrl_value;
+                 }
+             }
          }
       } // namespace aux
 
@@ -285,28 +317,24 @@ namespace asx {
             }
          }
 
-         // Initialization
+         /**
+          * @brief Initialize the pin with the given options
+          * @param args Options to configure the pin
+          * @details
+          * This method allows for configuring the pin with multiple options
+          * in a single call. The options can include:
+          * - Initial value        : value_t::high, value_t::low
+          * - Direction of the pin : dir_t::in, dir_t::out
+          * - Pull-up resistor     : pullup::enabled, pullup::disabled
+          * - Sense mode           : sense::rising, sense::falling, sense::bothedges, sense::level_low
+          * - Inversion            : invert::normal, invert::inverted
+          * @note The order of the arguments does not matter, but the types must be correct.
+          * @note The function will only set the pinctrl register if any of the arguments
+          *       are of type pinctrl_t or derived from it.
+          */
          template <typename... T>
          static inline constexpr void init(T... args) {
-            constexpr bool has_value = (std::is_same_v<T, value_t> || ...);
-
-            if constexpr (has_value) {
-               set(aux::extract_argument<value_t>(args...));
-            }
-
-            constexpr bool has_dir = (std::is_same_v<T, dir_t> || ...);
-
-            if constexpr (has_dir) {
-               set_dir(aux::extract_argument<dir_t>(args...));
-            }
-
-            // Compute the PINCTRL register value
-            uint8_t pinctrl_value = aux::compute_pinctrl<T...>(args...);
-
-            if (pinctrl_value != 0) {
-               register8_t* pinctrl = &(PORTDEF::base()->PIN0CTRL) + PIN_NUMBER;
-               *pinctrl = pinctrl_value;
-            }
+             aux::init_impl<PORTDEF, PIN_NUMBER>(PORTDEF{}, PIN_NUMBER, args...);
          }
       };
 
@@ -339,30 +367,15 @@ namespace asx {
             return *this;
          }
 
-         // Initialization
+         /**
+          * Initialize the pin with the given options
+          * @see PinDef::init()
+          * @returns a reference to the Pin object
+          */
          template <typename... T>
          inline constexpr Pin& init(T... args) {
-            constexpr bool has_value = (std::is_same_v<T, value_t> || ...);
-
-            if constexpr (has_value) {
-               set(aux::extract_argument<value_t>(args...));
-            }
-
-            constexpr bool has_dir = (std::is_same_v<T, dir_t> || ...);
-
-            if constexpr (has_dir) {
-               set_dir(aux::extract_argument<dir_t>(args...));
-            }
-
-            // Compute the PINCTRL register value
-            uint8_t pinctrl_value = aux::compute_pinctrl();
-
-            if (pinctrl_value != 0) {
-               register8_t* pinctrl = &(base()->PIN0CTRL) + (port_pin & 0x07);
-               *pinctrl = pinctrl_value;
-            }
-
-            return *this;
+             aux::init_impl<Port, pin()>(port(), pin(), args...);
+             return *this;
          }
 
          // Accessors
