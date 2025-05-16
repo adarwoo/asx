@@ -69,20 +69,6 @@ namespace asx {
       using Counting8 = Counting<uint8_t>;
       using Counting16 = Counting<uint16_t>;
 
-      /**
-       * Specialized instance of the timer A
-       */
-      template<asx::chrono::cpu_tick_t::rep N>
-      struct TimerDuration {
-         // Recover cpu_tick_t from the raw tick count N
-         static constexpr asx::chrono::cpu_tick_t duration = asx::chrono::cpu_tick_t(N);
-
-         static constexpr auto count() {
-            return duration.count();
-         }
-
-      };
-
       template<class Duration>
       struct TimerA
       {
@@ -162,14 +148,14 @@ namespace asx {
 
          // Variadic template function to set multiple compare registers
          template <typename... Durations>
-         static constexpr void set_compare(Durations... compare_values) {
+         static constexpr void set_compare(const Durations... compare_values) {
             static_assert(sizeof...(compare_values) <= 3, "Error: Too many compare values, maximum is 3.");
 
             // Ensure each duration is less than or equal to MaxDuration
             //(static_assert(compare_values <= max_duration, "Error: Compare value exceeds max timer duration"), ...);
 
             // Helper lambda to set each compare value (CMP0, CMP1, CMP2)
-            auto set_cmp = [&](int cmp_index, asx::chrono::cpu_tick_t cmp_value) {
+            auto set_cmp = [&](int cmp_index, const asx::chrono::cpu_tick_t cmp_value) {
                (&(TCA().CMP0))[cmp_index] = cmp_value.count() / std::get<0>(set_prescaler_for_maximum_ticks());
             };
 
@@ -225,7 +211,7 @@ namespace asx {
        * Specialized instance of the timer B
        */
       template<int N>
-      class TimerB
+      struct TimerB
       {
          using type = TCB_t;  // Specify the timer type as TCB_t
          using value_t = Counting16;
@@ -247,23 +233,17 @@ namespace asx {
          }
 
          // Variadic template function to set multiple compare registers
-         template <typename Duration>
-         constexpr void set_compare(const Duration& duration) {
-            // Convert the given duration to cpu_tick_t based on F_CPU
-            constexpr asx::chrono::cpu_tick_t compare_value = std::chrono::duration_cast<asx::chrono::cpu_tick_t>(duration);
-
-            static_assert( compare_value.count() < (value_t::maximum * 2), "Number of ticks is too big" );
-
+         static constexpr void set_compare(const asx::chrono::cpu_tick_t duration) {
             // Set the timer prescaler
             auto* timer = get_timer();
             timer->CNT = 0;  // Reset the counter
 
-            if (compare_value.count() < value_t::maximum) {
+            if (duration.count() < value_t::maximum) {
                timer->CTRLA = TCB_CLKSEL_DIV1_gc;
-               timer->CCMP = compare_value.count();
+               timer->CCMP = duration.count();
             } else {
                timer->CTRLA = TCB_CLKSEL_DIV2_gc;
-               timer->CCMP = compare_value.count() >> 1;
+               timer->CCMP = duration.count() >> 1;
             }
          }
 
