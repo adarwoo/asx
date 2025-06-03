@@ -311,9 +311,9 @@ namespace asx {
 
          static constexpr void set_dir(const dir_t dir) {
             if (dir == dir_t::in) {
-               asm volatile("sbi %0, %1" : : "I"(&PORTDEF::vbase()->DIR), "I"(PIN_NUMBER));
-            } else {
                asm volatile("cbi %0, %1" : : "I"(&PORTDEF::vbase()->DIR), "I"(PIN_NUMBER));
+            } else {
+               asm volatile("sbi %0, %1" : : "I"(&PORTDEF::vbase()->DIR), "I"(PIN_NUMBER));
             }
          }
 

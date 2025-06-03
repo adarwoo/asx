@@ -1,4 +1,4 @@
-#pragma once
+   #pragma once
 // MIT License
 //
 // Copyright (c) 2025 software@arreckx.com
@@ -39,7 +39,6 @@ namespace asx {
 
             for (uint8_t i=0; i<N; ++i) {
                 bool level = sample.get(i);
-                uint8_t thr = integrator[i];
 
                 if (level) {
                     if ( integrator[i] < THR ) {

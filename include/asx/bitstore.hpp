@@ -159,6 +159,84 @@ namespace asx
          return Iterator(*this, N);
       }
    };
+
+   // Specialization for 1 bit
+   template <>
+   class BitStore<1>
+   {
+   public:
+      static constexpr auto size = 1;
+      using storage_t = bool;
+
+   private:
+      storage_t bit;
+
+   public:
+      BitStore() : bit{false} {}
+      BitStore(storage_t value) : bit{value} {}
+
+      void set(size_t pos, bool value = true) {
+         if (pos == 0) bit = value;
+      }
+
+      bool get(size_t pos) const {
+         return (pos == 0) ? bit : false;
+      }
+
+      void reset(size_t pos) {
+         if (pos == 0) bit = false;
+      }
+
+      void toggle(size_t pos) {
+         if (pos == 0) bit = !bit;
+      }
+
+      void set() {
+         bit = true;
+      }
+
+      bool get() const {
+         return bit;
+      }
+
+      void reset() {
+         bit = false;
+      }
+
+      void toggle() {
+         bit = !bit;
+      }
+
+      BitStore operator^(const BitStore &other) const {
+         return BitStore(bit ^ other.bit);
+      }
+
+      BitStore operator&(const BitStore &other) const {
+         return BitStore(bit & other.bit);
+      }
+
+      BitStore operator|(const BitStore &other) const {
+         return BitStore(bit | other.bit);
+      }
+
+      bool operator==(const BitStore &other) const {
+         return bit == other.bit;
+      }
+
+      // Iterator for compatibility
+      class Iterator {
+         const BitStore &bs;
+         size_t pos;
+      public:
+         Iterator(const BitStore &b, size_t p) : bs(b), pos(p) {}
+         bool operator*() const { return bs.get(pos); }
+         Iterator &operator++() { ++pos; return *this; }
+         bool operator!=(const Iterator &other) const { return pos != other.pos; }
+      };
+
+      Iterator begin() const { return Iterator(*this, 0); }
+      Iterator end() const { return Iterator(*this, 1); }
+   };
 }
 
 // End if asx namespace
