@@ -241,6 +241,7 @@ namespace @NAMESPACE@ {
     class Datagram {
         using error_t = asx::modbus::error_t;
 
+        @DEVICE_ID@
         ///< Adjusted buffer to only receive the largest amount of data possible
         inline static uint8_t buffer[@BUFSIZE@];
         ///< Number of characters in the buffer
@@ -274,6 +275,7 @@ namespace @NAMESPACE@ {
             BAD_CRC = 2
         };
 
+        @SET_DEVICE_ID@
         static void reset() noexcept {
             cnt=0;
             crc.reset();
@@ -551,6 +553,9 @@ class Crc(UnsignedMatcher, _16bits):
     _bits = -16 # Negative for little endian
     def to_code(self):
         return "true"
+class RuntimeDeviceId(UnsignedMatcher, _8bits):
+    def to_code(self):
+        return "c == device_id";
 
 READ_COILS                    = u8(0x01, alias="READ_COILS")
 READ_DISCRETE_INPUTS          = u8(0x02, alias="READ_DISCRETE_INPUTS")
@@ -805,6 +810,8 @@ class CodeGenerator:
         self.buffer_index = 0
         # Specific callbacks
         self.on_ready_reply_callback = None
+        # Device ID. None for dynamic
+        self.device_id = None
 
         if "callbacks" not in tree:
             raise ParsingException("Callbacks are required")
@@ -854,6 +861,8 @@ class CodeGenerator:
 
     def generate_code(self):
         placeholders = {
+            "DEVICE_ID" : self.get_device_id(2),
+            "SET_DEVICE_ID" : self.set_device_id(2),
             "BUFSIZE" : str(self.max_buf_size),
             "NAMESPACE" : self.namespace,
             "ENUMS" : self.get_enums_text(2),
@@ -876,6 +885,25 @@ class CodeGenerator:
         template = TEMPLATE_CODE_SLAVE if self.mode == "slave" else TEMPLATE_CODE_MASTER
 
         return re.sub(r"(\s*)@(.*?)@(\n?)", replace_placeholder, template )
+
+    def get_device_id(self, indent):
+        tab = INDENT * indent
+
+        if self.device_id is None:
+            return f"""///< Runtime ID. Set-up before starting the modbus\n{tab}inline static uint8_t device_id = 255;"""
+
+        return f"""///< Device ID\n{tab}static constexpr auto device_id = uint8_t{self.device_id}"""
+
+    def set_device_id(self, indent):
+        if self.device_id is None:
+            tab = INDENT * indent
+
+            return "///< Set the device ID\n" + \
+                f"{tab}static inline void set_device_id(uint8_t new_id) {{\n" + \
+                f"{tab}{INDENT}device_id = new_id;\n" + \
+                f"{tab}}}"
+
+        return ""
 
     def get_enums_text(self, indent):
         tab = INDENT * indent
@@ -962,16 +990,26 @@ class CodeGenerator:
         current_state = self.new_state("DEVICE_ADDRESS", 0)
 
         for key, value in tree.items():
+            if key == "device": # No ID attached - runtime ID
+                device_state = self.new_state(f"DEVICE", 1)
+                address_matcher = RuntimeDeviceId(alias=device_state.name)
+                current_state.add(Transition(address_matcher, device_state))
+                for command in value:
+                    self.process_sequence(address_matcher, device_state, command)
+
             if key.startswith("device@"):
                 match = re.search(DEVICE_ADDR_RE, key)
+
                 if not match:
                     raise ParsingException("Malformed device address")
-                device_number = int(match.group(1), 0)
-                if device_number > 255:
-                    raise ParsingException("device address must be < 256")
 
-                device_state = self.new_state(f"DEVICE_{device_number}", 1)
-                address_matcher = u8(device_number, alias=device_state.name)
+                self.device_id = int(match.group(1), 0)
+
+                if self.device_id > 254:
+                    raise ParsingException("device address must be <= 254")
+
+                device_state = self.new_state(f"DEVICE_{self.device_id}", 1)
+                address_matcher = u8(self.device_id, alias=device_state.name)
                 current_state.add(Transition(address_matcher, device_state))
 
                 for command in value:
