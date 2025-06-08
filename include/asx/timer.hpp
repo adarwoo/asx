@@ -39,7 +39,7 @@ namespace asx {
          static timer_count_t to_timer_count(time_point tp) {
             return static_cast<timer_count_t>(tp.time_since_epoch().count());
          }
-         
+
          static duration abs_distance(time_point a, time_point b) {
             using signed_timer_count_t = std::make_signed<timer_count_t>::type;
 
@@ -56,7 +56,7 @@ namespace asx {
          }
       };
 
-      // Overload the lt operator to account for the roll over      
+      // Overload the lt operator to account for the roll over
       inline bool operator<(steady_clock::time_point lhs, steady_clock::time_point rhs) {
          using rep = steady_clock::rep;
          using signed_rep = std::make_signed<rep>::type;
@@ -66,7 +66,7 @@ namespace asx {
 
          return static_cast<signed_rep>(lhs_raw - rhs_raw) < 0;
       }
-      
+
 
       ///< Shortcut for the C++ handle
       class Instance {
@@ -92,14 +92,19 @@ namespace asx {
       // Operations
       public:
          bool cancel() {
-            return timer_cancel(instance);
+            if ( instance != timer_instance_t{TIMER_INVALID_INSTANCE} ) {
+               return timer_cancel(instance);
+            }
+
+            // Instance is null
+            return false;
          }
       };
 
       using duration = steady_clock::duration;
       using time_point = steady_clock::time_point;
 
-      inline bool cancel(uint32_t timer_id) {
+      inline bool cancel(timer_instance_t timer_id) {
          return timer_cancel(timer_id);
       }
    }
