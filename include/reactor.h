@@ -48,6 +48,23 @@ typedef uint8_t reactor_priority_t;
 #define reactor_prio_low 0
 #define reactor_prio_high 1
 
+/**
+ * Co-routine style macro to simplify yeilding.
+ * Example:
+ *   static int local_storage; // Do not initialise here
+ *   reactor_co_begin();
+ *    local_storage = 0; // Initialise here
+ *   // Do stuff...
+ *   reactor_co_yield();
+ *   // Do more suff
+ *   reactor_co_yield();
+ *   // Final
+ *   reactor_co_end();
+ */
+#define reactor_co_begin() static uint16_t state=0; switch(state) { case 0: {
+#define reactor_co_yield()  } state=__LINE__; reactor_yield(); return; case __LINE__: {
+#define reactor_co_end() }}; state=0;
+
 
 /**
  * @typedef reactor_handle_t
