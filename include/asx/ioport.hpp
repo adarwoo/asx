@@ -404,6 +404,48 @@ namespace asx {
             return 1U << pin();
          }
 
+         bool is_an_output() const {
+            return (port().vbase()->DIR & mask()) != 0;
+         }
+
+         uint8_t get_pinctrl() const {
+            register8_t* pinctrl = &(port().base()->PIN0CTRL) + pin();
+            return *pinctrl;
+         }
+
+         void set_pinctrl(uint8_t value) const {
+            register8_t* pinctrl = &(port().base()->PIN0CTRL) + pin();
+            *pinctrl = value;
+         }
+
+         void set_invert(const invert_t invert) const {
+            register8_t* pinctrl = &(port().base()->PIN0CTRL) + pin();
+            if (invert == invert::inverted) {
+               *pinctrl |= PORT_INVEN_bm;
+            } else {
+               *pinctrl &= ~PORT_INVEN_bm;
+            }
+         }
+
+         bool is_inverted() const {
+            register8_t* pinctrl = &(port().base()->PIN0CTRL) + pin();
+            return (*pinctrl & PORT_INVEN_bm) != 0;
+         }
+
+         void set_pullup(const pullup_t pullup) const {
+            register8_t* pinctrl = &(port().base()->PIN0CTRL) + pin();
+            if (pullup == pullup::enabled) {
+               *pinctrl |= PORT_PULLUPEN_bm;
+            } else {
+               *pinctrl &= ~PORT_PULLUPEN_bm;
+            }
+         }
+
+         void set_sense(const sense_t sense) const {
+            register8_t* pinctrl = &(port().base()->PIN0CTRL) + pin();
+            *pinctrl = (*pinctrl & ~PORT_ISC_gm) | static_cast<uint8_t>(sense);
+         }
+
 #ifdef SIM
          inline PORT_t* base() const {
             return port().base();

@@ -187,26 +187,22 @@ namespace asx
          uint8_t bitpos;  // 0-7
          uint8_t bytepos; // 0-bytes_in_bank
 
-         enum class Op : uint8_t
-         {
+         enum class Op : uint8_t {
             idle,
             update_bits,
             new_bank_set_new,
             new_bank_erase_old
          } op = Op::idle;
 
-         inline uint16_t get_current_page_address() const
-         {
+         inline uint16_t get_current_page_address() const {
             return EEPROM_START + EEPROM_PAGE_SIZE * page;
          }
 
-         inline bank_t *get_bank0_ptr() const
-         {
+         inline bank_t *get_bank0_ptr() const {
             return (bank_t *)get_current_page_address();
          }
 
-         bank_t *get_bank_ptr() const
-         {
+         inline bank_t *get_bank_ptr() const {
             return get_bank0_ptr() + bankpos;
          }
 
@@ -221,8 +217,7 @@ namespace asx
           */
          void increment();
 
-         uint32_t get_count()
-         {
+         inline uint32_t get_count() {
             return counter;
          }
 
