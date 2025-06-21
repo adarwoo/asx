@@ -136,38 +136,57 @@ __always_inline static VPORT_t *arch_ioport_port_to_vbase(ioport_port_t port)
    (port * IOPORT_VPORT_OFFSET));
 }
 
-__always_inline static void ioport_set_pin(ioport_pin_t pin)
-{
-   ioport_port_t port = ioport_pin_to_port_id(pin);
-   VPORT_t *vport = arch_ioport_port_to_vbase(port);
-
-   vport->OUT |= (1 << ioport_pin_to_port_id(pin));
-}
-
-__always_inline static void ioport_clear_pin(ioport_pin_t pin)
-{
-   ioport_port_t port = ioport_pin_to_port_id(pin);
-   uint8_t bit = pin & 0x07;  // same as (pin % 8), but faster
-   VPORT_t *vport = arch_ioport_port_to_vbase(port);
-
-   vport->OUT &= ~(1 << bit);
-}
-
 __always_inline static PORT_t *ioport_pin_to_base(ioport_pin_t pin)
 {
    return arch_ioport_port_to_base(ioport_pin_to_port_id(pin));
 }
 
-__always_inline static ioport_port_mask_t arch_ioport_pin_to_mask(
-ioport_pin_t pin)
+/**
+ * \brief Convert a pin ID into a bitmask mask for the given pin on its port.
+ *
+ * \param pin IOPORT pin ID to convert
+ * \retval Bitmask with a bit set that corresponds to the given pin ID in its port
+ */
+__always_inline static ioport_port_mask_t ioport_pin_to_mask(ioport_pin_t pin)
 {
    return 1U << (pin & 0x07);
 }
 
-__always_inline static ioport_port_mask_t ioport_pin_to_index(
-ioport_pin_t pin)
+__always_inline static ioport_port_mask_t ioport_pin_to_index(ioport_pin_t pin)
 {
    return (pin & 0x07);
+}
+
+__always_inline static void ioport_vport_set_pin(ioport_pin_t pin)
+{
+   ioport_port_t port = ioport_pin_to_port_id(pin);
+   VPORT_t *vport = arch_ioport_port_to_vbase(port);
+
+   vport->OUT |= ioport_pin_to_mask(pin);
+}
+
+__always_inline static void ioport_vport_clear_pin(ioport_pin_t pin)
+{
+   ioport_port_t port = ioport_pin_to_port_id(pin);
+   VPORT_t *vport = arch_ioport_port_to_vbase(port);
+
+   vport->OUT &= ~ioport_pin_to_mask(pin);
+}
+
+__always_inline static void ioport_vport_set_dir(ioport_pin_t pin)
+{
+   ioport_port_t port = ioport_pin_to_port_id(pin);
+   VPORT_t *vport = arch_ioport_port_to_vbase(port);
+
+   vport->DIR |= ioport_pin_to_mask(pin);
+}
+
+__always_inline static void ioport_vport_clear_dir(ioport_pin_t pin)
+{
+   ioport_port_t port = ioport_pin_to_port_id(pin);
+   VPORT_t *vport = arch_ioport_port_to_vbase(port);
+
+   vport->DIR &= ~ioport_pin_to_mask(pin);
 }
 
 __always_inline static void arch_ioport_init(void)
@@ -183,7 +202,7 @@ ioport_port_mask_t mask)
    uint8_t flags = cpu_irq_save();
 
    for (uint8_t i = 0; i < 8; i++) {
-      if (mask & arch_ioport_pin_to_mask(i)) {
+      if (mask & ioport_pin_to_mask(i)) {
          pin_ctrl[i] &= ~PORT_ISC_gm;
       }
    }
@@ -213,7 +232,7 @@ ioport_port_mask_t mask)
    uint8_t flags = cpu_irq_save();
 
    for (uint8_t i = 0; i < 8; i++) {
-      if (mask & arch_ioport_pin_to_mask(i)) {
+      if (mask & ioport_pin_to_mask(i)) {
          pin_ctrl[i] |= PORT_ISC_INPUT_DISABLE_gc;
       }
    }
@@ -244,7 +263,7 @@ ioport_port_mask_t mask, ioport_mode_t mode)
    uint8_t flags = cpu_irq_save();
 
    for (uint8_t i = 0; i < 8; i++) {
-      if (mask & arch_ioport_pin_to_mask(i)) {
+      if (mask & ioport_pin_to_mask(i)) {
          pin_ctrl[i]
          = (pin_ctrl[i] &
          PORT_ISC_gm) | new_mode_bits;
@@ -287,9 +306,9 @@ enum ioport_direction dir)
    PORT_t *base = ioport_pin_to_base(pin);
 
    if (dir == IOPORT_DIR_OUTPUT) {
-      base->DIRSET = arch_ioport_pin_to_mask(pin);
+      base->DIRSET = ioport_pin_to_mask(pin);
       } else if (dir == IOPORT_DIR_INPUT) {
-      base->DIRCLR = arch_ioport_pin_to_mask(pin);
+      base->DIRCLR = ioport_pin_to_mask(pin);
    }
 }
 
@@ -299,9 +318,9 @@ bool level)
    PORT_t *base = ioport_pin_to_base(pin);
 
    if (level) {
-      base->OUTSET = arch_ioport_pin_to_mask(pin);
+      base->OUTSET = ioport_pin_to_mask(pin);
       } else {
-      base->OUTCLR = arch_ioport_pin_to_mask(pin);
+      base->OUTCLR = ioport_pin_to_mask(pin);
    }
 }
 
@@ -322,7 +341,7 @@ __always_inline static bool arch_ioport_get_pin_level(ioport_pin_t pin)
 {
    PORT_t *base = ioport_pin_to_base(pin);
 
-   return base->IN & arch_ioport_pin_to_mask(pin);
+   return base->IN & ioport_pin_to_mask(pin);
 }
 
 __always_inline static ioport_port_mask_t arch_ioport_get_port_level(
@@ -337,7 +356,7 @@ __always_inline static void arch_ioport_toggle_pin_level(ioport_pin_t pin)
 {
    PORT_t *base = ioport_pin_to_base(pin);
 
-   base->OUTTGL = arch_ioport_pin_to_mask(pin);
+   base->OUTTGL = ioport_pin_to_mask(pin);
 }
 
 __always_inline static void arch_ioport_toggle_port_level(ioport_port_t port,
@@ -373,7 +392,7 @@ ioport_port_mask_t mask, enum ioport_sense pin_sense)
    uint8_t flags = cpu_irq_save();
 
    for (uint8_t i = 0; i < 8; i++) {
-      if (mask & arch_ioport_pin_to_mask(i)) {
+      if (mask & ioport_pin_to_mask(i)) {
          pin_ctrl[i]
          = (pin_ctrl[i] &
          ~PORT_ISC_gm) | new_sense_bits;
@@ -614,18 +633,6 @@ static inline void ioport_set_port_sense_mode(ioport_port_t port,
 {
 	arch_ioport_set_port_sense_mode(port, mask, pin_sense);
 }
-
-/**
- * \brief Convert a pin ID into a bitmask mask for the given pin on its port.
- *
- * \param pin IOPORT pin ID to convert
- * \retval Bitmask with a bit set that corresponds to the given pin ID in its port
- */
-static inline ioport_port_mask_t ioport_pin_to_mask(ioport_pin_t pin)
-{
-	return arch_ioport_pin_to_mask(pin);
-}
-
 
 #ifdef __cplusplus
 }
