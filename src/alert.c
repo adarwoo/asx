@@ -26,6 +26,18 @@
 #endif
 
 /**
+ * Weak hook function: can be overridden elsewhere
+ * Lights the alert LED if defined
+ */
+__attribute__((weak)) void alert_user_function(void) {
+   // Dump to the debug pin
+   #ifdef ALERT_OUTPUT_PIN
+   ioport_vport_set_dir(ALERT_OUTPUT_PIN);
+   ioport_vport_set_pin(ALERT_OUTPUT_PIN);
+   #endif
+}
+
+/**
  * We need to initialize the alert API
  * For LED notification, we need to set the LED direction.
  */
@@ -36,7 +48,6 @@ static void
 alert_init( void )
 {
 #ifdef ALERT_OUTPUT_PIN
-   ioport_set_pin_dir( ALERT_OUTPUT_PIN, IOPORT_DIR_OUTPUT );
 #endif
 }
 
@@ -60,10 +71,7 @@ void alert_record( bool doAbort, int line, const char *file )
    trace("ALERT!%u %s", line, (last_slash) ? last_slash + 1 : file);
    #endif
 
-   // Dump to the debug pin
-   #ifdef ALERT_OUTPUT_PIN
-   ioport_set_pin_level( ALERT_OUTPUT_PIN, true );
-   #endif
+   alert_user_function();
 
    // Output to stdout?
    #ifdef ALERT_TO_STDOUT

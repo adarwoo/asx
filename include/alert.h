@@ -33,6 +33,14 @@ extern "C"
 /* Public API                                                           */
 /************************************************************************/
 
+/**
+ * Prototype to the user alert function. A weak default implementation
+ * is provided, which turn on the alert LED.
+ * This can be overriden by the application.
+ * This function should be used in all critical tests
+ */
+void alert_user_function(void);
+
 /** Ready the alert stack */
 // Now done in init5 void alert_init(void);
 
