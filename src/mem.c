@@ -1,12 +1,15 @@
-/*
+/**
+ * @file
+ * @{
  * mem.c
  * Poor's man dynamic allocation
  * Allow allocation of memory such as malloc, but as one way only (no free.)
- * To detect stack collision, the available space is filled with 0xaa.
- * 
- * Created: 19/05/2024 20:32:49
- *  Author: micro
- */ 
+ * Note: Check watchdog.c which does a RAM test and fills the RAM with 0xAA.
+ *
+ * @date: 19/05/2024 20:32:49
+ * @author: software@arreckx.com
+ * @}
+ */
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
@@ -27,7 +30,7 @@ extern char __heap_end;
 #endif
 
 
-/** @def HEAP_STACK_GUARD 
+/** @def HEAP_STACK_GUARD
  * Number of bytes to keep clear from the stack
  * When allocating, the allocator makes sure there is at least this
  * amount of un-touched memory to the current stack
@@ -46,18 +49,6 @@ extern char __heap_end;
 static char *_heap_allocation_next_block = &__heap_start;
 
 /**
- * Fill the heap with a 0xaa
- * This is called prior to C++ static constructors
- */
-static void
-   __attribute__ ((section (".init5"), naked, used))
-   _mem_stack_init(void)
-{
-   // Fill the heap with 0xaa
-   memset(&__heap_start, 0xaa, HEAP_SIZE);
-}
-
-/**
  * Allocate some memory from the heap (what's left of the RAM passed the bss and data).
  * The memory content is cleared to all 0.
  * A check is done to detect if there is a risk a collision with the stack
@@ -67,7 +58,7 @@ static void
 void *mem_calloc(size_t __nele, size_t __size)
 {
    size_t block_size = __nele * __size;
-   
+
    char *retval = _heap_allocation_next_block;
    _heap_allocation_next_block += block_size;
 
@@ -81,8 +72,8 @@ void *mem_calloc(size_t __nele, size_t __size)
       alert_and_stop_if(*check != 0xaa);
    } while ( ++check != last);
 
-   // Zero the memory   
+   // Zero the memory
    memset(retval, 0, block_size);
-   
+
    return retval;
 }
