@@ -59,12 +59,13 @@ SRCS+=\
   $(ASX_PATH)src/builtin.cpp \
   $(ASX_PATH)src/sysclk.c \
   $(ASX_PATH)src/alert.c \
-	$(ASX_FILES)
+  $(ASX_FILES)
 
 ifndef SIM
 SRCS+=\
   $(ASX_PATH)src/_ccp.s \
-	$(ASX_PATH)src/mem.c \
+  $(ASX_PATH)src/mem.c \
+  $(ASX_PATH)src/watchdog.c \
 
 endif
 
