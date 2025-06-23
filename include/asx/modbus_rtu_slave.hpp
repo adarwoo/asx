@@ -33,7 +33,7 @@ namespace asx {
          // Create a 4xT or 2ms timer - whichever is the longest
          using Timer = asx::hw_timer::TimerA<T>;
 
-         inline static const auto must_reply = [](const t35_timeout&) {
+         inline static const auto must_reply = []() {
             bool retval = false;
 
             switch ( Datagram::get_status() ) {
@@ -81,12 +81,15 @@ namespace asx {
                , "initial"_s             + event<char_received>            / start_timer = "initial"_s
                , "idle"_s                + on_entry<_>                     / reset
                , "idle"_s                + event<char_received>            / handle_char = "reception"_s
-               , "reception"_s           + event<t15_timeout>                            = "control_and_waiting"_s
+               , "reception"_s           + event<t15_timeout> [must_reply]               = "control_and_waiting"_s // anticipate
+               , "reception"_s           + event<t15_timeout>                            = "skip_frame"_s
                , "reception"_s           + event<char_received>            / handle_char = "reception"_s
-               , "control_and_waiting"_s + event<t35_timeout> [must_reply]               = "reply"_s
+               , "skip_frame"_s          + event<t35_timeout>                            = "idle"_s    // Not for us, ensure good frame
+               , "skip_frame"_s          + event<char_received>                          = "initial"_s // Unlikely - but a possibility
+               , "control_and_waiting"_s + on_entry<_>                     / ready_reply
+               , "control_and_waiting"_s + event<t35_timeout>                            = "reply"_s
                , "control_and_waiting"_s + event<char_received>                          = "initial"_s
                , "control_and_waiting"_s + event<t35_timeout>                            = "idle"_s
-               , "reply"_s               + on_entry<_>                     / ready_reply
                , "reply"_s               + event<char_received>                          = "initial"_s // Unlikely - but a possibility
                , "reply"_s               + event<t40_timeout> [broadcast]                = "idle"_s    // In broadcast - no answer
                , "reply"_s               + event<t40_timeout>                            = "emission"_s
