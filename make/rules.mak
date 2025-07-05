@@ -121,6 +121,7 @@ $(BIN)$(BIN_EXT) : $(BUILD_DIR)/$(BIN)$(BIN_EXT)
 
 $(BUILD_DIR)/$(BIN)$(BIN_EXT) : $(OBJS)
 	@echo Linking to $@
+	$(PRE_LINK)
 	$(MUTE)$(LD) -Wl,--start-group $^ $(foreach lib,$(LIBS),-l$(lib)) -Wl,--end-group ${LDFLAGS} -o $@
 	$(POST_LINK)
 	$(DIAG)
