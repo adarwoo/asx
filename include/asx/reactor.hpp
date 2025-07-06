@@ -39,7 +39,6 @@
 #include <functional>
 
 #include <reactor.h>
-#include <trace.h>
 
 #include <asx/timer.hpp>
 

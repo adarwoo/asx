@@ -67,6 +67,7 @@ namespace asx {
 
          static_assert(N < 2, "Invalid USART number");
 
+      public:
          static USART_t & get() {
             if constexpr (N == 0) {
                return USART0;

@@ -23,6 +23,7 @@
  * @author software@arreckx.com
  */
 #include <stdbool.h>
+#include <ulog.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -45,13 +46,13 @@ void alert_user_function(void);
 // Now done in init5 void alert_init(void);
 
 /** Each application must customize this function */
-void alert_record(bool abort, int line, const char *file);
+void alert_record(bool abort);
 
 /** Raise and alert. This macro adds the line and file automatically */
-#define alert() alert_record(false, __LINE__, __FILE__)
+#define alert() do { ULOG0_ERROR("ALERT!"); alert_record(false) } while(0)
 
 /** Raise an alert and stop. This macro adds the line and file automatically */
-#define alert_and_stop() alert_record(true, __LINE__, __FILE__)
+#define alert_and_stop() do { ULOG0_ERROR("ALERT!"); alert_record(true); } while(0)
 
 /**
  * Conditionally raise and alert and stop.
@@ -61,7 +62,8 @@ void alert_record(bool abort, int line, const char *file);
  */
 #define alert_and_stop_if(cond)               \
    if (cond) {                                \
-      alert_record(true, __LINE__, __FILE__); \
+      ULOG0_ERROR("ALERT_AND_STOP_IF");       \
+      alert_record(true);                     \
    }
 
 #ifdef __cplusplus

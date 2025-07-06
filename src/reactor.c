@@ -90,6 +90,16 @@ static void
 }
 
 /**
+ * Weak idle tasklet
+ * Called when the CPU is about to go idle
+ * This should be overriden by the ulog
+ * @note The interrupts are disabled at this point
+ */
+__attribute__((weak))
+void reactor_idle_tasklet(void)  {
+}
+
+/**
  * Register a new reactor handler.
  *
  * The priority determines which handlers are called first in a priority scheduler.
@@ -244,6 +254,10 @@ void reactor_run(void)
 
       if ( _reactor_notifications == 0 )
       {
+         // Allow the most non-essential function to run - like restarting the UART for ulog
+         reactor_idle_tasklet();
+
+         // Allow measure the amount of 'free' time
          debug_set(REACTOR_IDLE);
 
          // The AVR guarantees that sleep is executed before any pending interrupts

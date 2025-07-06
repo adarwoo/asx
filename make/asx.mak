@@ -41,7 +41,7 @@ endef
 
 # Define dependencies and source files for each module
 DEPOF_timer       := reactor timer.c
-DEPOF_modbus_rtu  := hw_timer reactor timer uart logger modbus_rtu.cpp trace
+DEPOF_modbus_rtu  := hw_timer reactor timer uart logger modbus_rtu.cpp ulog
 DEPOF_pca9555     := i2c_master pca9555.cpp
 DEPOF_i2c_master  := reactor timer logger i2c_master.cpp
 DEPOF_reactor     := reactor.c
@@ -50,15 +50,15 @@ DEPOF_uart        := uart.cpp
 DEPOF_logger      := logger
 DEPOF_piezzo      := piezzo.c
 DEPOF_eeprom      := eeprom.cpp
-DEPOF_trace       := timer trace.c
+DEPOF_ulog        := ulog.c
 
 ASX_FILES 			:= $(sort $(call resolve_deps,$(ASX_USE)))
 
 # Append ASX code files
 SRCS+=\
-  $(ASX_PATH)src/builtin.cpp \
   $(ASX_PATH)src/sysclk.c \
-  $(ASX_PATH)src/alert.c \
+  $(ASX_PATH)src/builtin.cpp \
+  $(ASX_PATH)src/alert.cpp \
   $(ASX_FILES)
 
 ifndef SIM

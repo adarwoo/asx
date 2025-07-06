@@ -41,7 +41,6 @@ define PRE_LINK
 			print; \
 			print "  .logs (NOLOAD) :"; \
 			print "  {"; \
-			print "    PROVIDE(__start_logs = .);"; \
 			print "    KEEP(*(.logs))"; \
 			print "  } > logmeta"; \
 			print ""; \

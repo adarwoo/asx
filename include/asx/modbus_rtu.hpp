@@ -25,7 +25,6 @@
 #include <cstdio>
 #endif
 
-#include <trace.h>
 #include <string_view>
 
 #include <boost/sml.hpp>
@@ -154,22 +153,22 @@ namespace asx {
       struct Logging {
          template <class SM, class TEvent>
          void log_process_event(const TEvent& evt) {
-            TRACE_INFO(MODBUS, "[evt] %s", (char*)evt.c_str());
+            ULOG_INFO("[event]", evt.c_str());
          }
 
          template <class SM, class TGuard, class TEvent>
          void log_guard(const TGuard&, const TEvent&, bool result) {
-            TRACE_INFO(MODBUS, "[grd]");
+            ULOG_INFO("[guard] - yeilds:", result);
          }
 
          template <class SM, class TAction, class TEvent>
          void log_action(const TAction& act, const TEvent& evt) {
-            TRACE_INFO(MODBUS, "[act]");
+            ULOG_INFO("[action]");
          }
 
          template <class SM, class TSrcState, class TDstState>
          void log_state_change(const TSrcState& src, const TDstState& dst) {
-            TRACE_INFO(MODBUS, "[>] %s -> %s", src.c_str(), dst.c_str());
+            ULOG_INFO("[state transition to] :", dst.c_str());
          }
       };
    } // namespace modbus
