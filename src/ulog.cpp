@@ -1,9 +1,10 @@
-#include <avr/interrupt.h>
+#include <interrupt.h>
 
 #include <span>
 
 #include <asx/uart.hpp>
 #include <asx/ulog.hpp>
+#include <asx/reactor.hpp>
 
 namespace {
    // ----------------------------------------------------------------------
@@ -27,19 +28,30 @@ namespace {
    // ----------------------------------------------------------------------
    volatile uint8_t log_head = 0, log_tail = 0;
    LogPacket log_buffer[BUF_SIZE];
+   asx::reactor::Handle react_to_initiate_transmit = asx::reactor::null;
 
    // ----------------------------------------------------------------------
    // Internal functions
    // ----------------------------------------------------------------------
    LogPacket *reserve_log_packet() {
       LogPacket *retval = nullptr;
+
+      // Disable interrupt - but save since this could be used from within an interrupt
+      auto save_flags =  cpu_irq_save();
+
       uint8_t next = (log_head + 1) % BUF_SIZE;
 
       if (next != log_tail) {
          retval = &log_buffer[log_head];
          log_head = next;
-      }      
-      
+      }
+
+      // Since we've issued a slot - it will require sending
+      asx::reactor::notify_from_isr(react_to_initiate_transmit);
+
+      // Restore SREG
+      cpu_irq_restore(save_flags);
+
       return retval;
    }
 }
@@ -126,33 +138,41 @@ namespace asx {
          return static_cast<uint8_t>(out - start);
       }
 
-      // Start transmission if idle
+      /**
+       * Initiate transmission reactor handler
+       * Invoked at every insertion and once a transmit is complete
+       * Checks for pending data
+       * If found, encode and initiates the transmission on the UART
+       */
       static void start_tx_if_needed() {
-         if (!to_send.empty()) return;
+         // Avoid race condition since an interrupt could be logging
+         auto save_flags =  cpu_irq_save();
 
-         if (log_tail == log_head) return; // No data
+         if (to_send.empty() and log_tail != log_head) {
+            // Data to send
+            LogPacket& pkt = log_buffer[log_tail];
+            log_tail = (log_tail + 1) % BUF_SIZE;
 
-         LogPacket& pkt = log_buffer[log_tail];
-         log_tail = (log_tail + 1) % BUF_SIZE;
+            uint8_t encoded_len = cobs_encode(pkt.data, pkt.len, tx_encoded);
+            to_send = std::span<const uint8_t>(tx_encoded, encoded_len);
 
-         uint8_t encoded_len = cobs_encode(pkt.data, pkt.len, tx_encoded);
-         to_send = std::span<const uint8_t>(tx_encoded, encoded_len);
+            // Enable DRE interrupt
+            uart::get().CTRLA |= USART_DREIE_bm;
+         }
 
-         // Enable DRE interrupt
-         uart::get().CTRLA |= USART_DREIE_bm;
+         // Restore SREG
+         cpu_irq_restore(save_flags);
       }
 
-      // Overrides the reactor idle tasklet to re-start the output of log
-      extern "C" void reactor_idle_tasklet(void) {
-         start_tx_if_needed();
-      }
-
-      // Self initialise early on
+      // Self initialise very early on to allow all to use
       void __attribute__ ((section (".init0"), naked, used))
-      init() {
+      init_ulog() {
          uart::init();
          uart::disable_rx();
          uart::get().CTRLA = 0; // No interrupt at this stage
+
+         // Register the reactor
+         react_to_initiate_transmit = asx::reactor::bind(start_tx_if_needed);
       }
 
       // There is space in the buffer
@@ -163,6 +183,9 @@ namespace asx {
          } else {
             // Disable all interrupts
             uart::get().CTRLA = 0;
+
+            // Check for pending sends to encode and start transmitting
+            asx::reactor::notify_from_isr(react_to_initiate_transmit);
          }
       }
    }

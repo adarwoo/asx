@@ -30,7 +30,7 @@
 #include <limits.h>  // for CHAR_BIT
 #include <stdarg.h>
 
-#include "interrupt.h"
+#include <interrupt.h>
 
 #include "alert.h"
 #include "debug.h"
@@ -78,7 +78,7 @@ static reactor_handle_t _reactor_running_handle = REACTOR_NULL_HANDLE;
  * This is called prior to C++ static constructors
  */
 static void
-   __attribute__ ((section (".init5"), naked, used))
+   __attribute__ ((section (".init0"), naked, used))
    _reactor_init(void)
 {
    // Use a debug pin if available
@@ -87,16 +87,6 @@ static void
 
    // Allow simplest sleep mode to resume very fast
    sleep_enable();
-}
-
-/**
- * Weak idle tasklet
- * Called when the CPU is about to go idle
- * This should be overriden by the ulog
- * @note The interrupts are disabled at this point
- */
-__attribute__((weak))
-void reactor_idle_tasklet(void)  {
 }
 
 /**
@@ -254,9 +244,6 @@ void reactor_run(void)
 
       if ( _reactor_notifications == 0 )
       {
-         // Allow the most non-essential function to run - like restarting the UART for ulog
-         reactor_idle_tasklet();
-
          // Allow measure the amount of 'free' time
          debug_set(REACTOR_IDLE);
 
