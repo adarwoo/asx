@@ -14,6 +14,8 @@ namespace {
    // Circular buffer (stubbed here)
    constexpr int MAX_PAYLOAD = 4;
    constexpr int BUF_SIZE = 16;
+   // COBS framing char
+   constexpr auto EOF = uint8_t{0xA6};
 
    // ----------------------------------------------------------------------
    // Local types
@@ -63,7 +65,7 @@ namespace {
 extern "C" void ulog_detail_emit0(uint8_t id) {
    if (LogPacket* dst = reserve_log_packet()) {
       dst->data[0] = id;
-      dst->len = 0;
+      dst->len = 1;
    }
 }
 
@@ -71,7 +73,7 @@ extern "C" void ulog_detail_emit8(uint8_t id, uint8_t v0) {
    if (LogPacket* dst = reserve_log_packet()) {
       dst->data[0] = id;
       dst->data[1] = v0;
-      dst->len = 1;
+      dst->len = 2;
    }
 }
 
@@ -80,7 +82,7 @@ extern "C" void ulog_detail_emit16(uint8_t id, uint16_t v) {
       dst->data[0] = id;
       dst->data[1] = v & 0xFF;
       dst->data[2] = v >> 8;
-      dst->len = 2;
+      dst->len = 3;
    }
 }
 
@@ -91,7 +93,7 @@ extern "C" void ulog_detail_emit32(uint8_t id, uint32_t v) {
       dst->data[2] = (v >> 8) & 0xFF;
       dst->data[3] = (v >> 16) & 0xFF;
       dst->data[4] = (v >> 24) & 0xFF;
-      dst->len = 4;
+      dst->len = 5;
    }
 }
 
@@ -106,37 +108,35 @@ namespace asx {
          uart::CompileTimeConfig<115200, uart::width::_8, uart::parity::none, uart::stop::_1>
       >;
 
-      // Scratch buffer for encoded output (COBS adds +2 overhead worse case)
+      // Scratch buffer for encoded output. Worse case - The payload(COBS adds +2 overhead worse case)
       static uint8_t tx_encoded[sizeof(LogPacket::data) + 2];
       static std::span<const uint8_t> to_send;
 
       // COBS encoder: encodes input into output, returns encoded length
-      static uint8_t cobs_encode(const uint8_t* in, uint8_t len, uint8_t* out) {
-         uint8_t* start = out++;
+      static uint8_t cobs_encode(const uint8_t* input, uint8_t length) {
+         uint8_t read_index = 0;
+         uint8_t write_index = 1;
+         uint8_t code_index = 0;
          uint8_t code = 1;
-         uint8_t* code_ptr = start;
 
-         for (uint8_t i = 0; i < len; ++i) {
-            if (in[i] == 0) {
-               *code_ptr = code;
-               code_ptr = out++;
+         while (read_index < length) {
+            if (input[read_index] == EOF) {
+               tx_encoded[code_index] = code;
+               code_index = write_index++;
                code = 1;
             } else {
-               *out++ = in[i];
-               ++code;
-               if (code == 0xFF) {
-                  *code_ptr = code;
-                  code_ptr = out++;
-                  code = 1;
-               }
+               tx_encoded[write_index++] = input[read_index];
+               code++;
             }
+            
+            ++read_index;
          }
 
-         *code_ptr = code;
-         *out++ = 0; // COBS terminator
+         tx_encoded[code_index] = code;
+         tx_encoded[write_index++] = EOF; // end frame
 
-         return static_cast<uint8_t>(out - start);
-      }
+         return write_index;
+   }
 
       /**
        * Initiate transmission reactor handler
@@ -153,7 +153,7 @@ namespace asx {
             LogPacket& pkt = log_buffer[log_tail];
             log_tail = (log_tail + 1) % BUF_SIZE;
 
-            uint8_t encoded_len = cobs_encode(pkt.data, pkt.len, tx_encoded);
+            uint8_t encoded_len = cobs_encode(pkt.data, pkt.len);
             to_send = std::span<const uint8_t>(tx_encoded, encoded_len);
 
             // Enable DRE interrupt
@@ -165,8 +165,8 @@ namespace asx {
       }
 
       // Self initialise very early on to allow all to use
-      void __attribute__ ((section (".init0"), naked, used))
-      init_ulog() {
+      //void __attribute__ ((section (".init0"), naked, used))
+      void init() {
          uart::init();
          uart::disable_rx();
          uart::get().CTRLA = 0; // No interrupt at this stage

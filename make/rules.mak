@@ -106,7 +106,7 @@ LD               = $(if $(findstring .cpp,$(suffix $(SRCS))),$(LINK.cxx),$(LINK.
 BUILDDIRS        = $(sort $(dir $(OBJS)))
 
 # Does the project have a trace config?
-CPPFLAGS += $(if $(wildcard $(TOP)/conf/conf_trace.h), -DHAS_TRACE_CONFIG_FILE,)
+CPPFLAGS += $(if $(wildcard $(TOP)/conf/conf_ulog.h), -DHAS_ULOG_CONFIG_FILE,)
 
 all : $(BUILDDIRS) $(BUILD_DIR)/$(BIN)$(BIN_EXT)
 
