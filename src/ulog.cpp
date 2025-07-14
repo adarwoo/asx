@@ -86,6 +86,16 @@ extern "C" void ulog_detail_emit16(uint8_t id, uint16_t v) {
    }
 }
 
+extern "C" void ulog_detail_emit24(uint8_t id, uint8_t v0, uint8_t v1, uint8_t v2) {
+   if (LogPacket* dst = reserve_log_packet()) {
+      dst->data[0] = id;
+      dst->data[1] = v0;
+      dst->data[2] = v1;
+      dst->data[3] = v2;
+      dst->len = 4;
+   }
+}
+
 extern "C" void ulog_detail_emit32(uint8_t id, uint32_t v) {
    if (LogPacket* dst = reserve_log_packet()) {
       dst->data[0] = id;
@@ -128,7 +138,7 @@ namespace asx {
                tx_encoded[write_index++] = input[read_index];
                code++;
             }
-            
+
             ++read_index;
          }
 

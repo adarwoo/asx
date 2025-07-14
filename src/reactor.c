@@ -241,7 +241,7 @@ void reactor_run(void)
    {
       debug_clear(REACTOR_BUSY);
       cli();
-
+   
       if ( _reactor_notifications == 0 )
       {
          // Allow measure the amount of 'free' time

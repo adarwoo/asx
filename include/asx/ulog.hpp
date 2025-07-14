@@ -241,6 +241,19 @@ do {                                                                          \
             :: [b0] "r"(b0), [b1] "r"(b1)                                     \
             : "r24", "r23", "r22"                                             \
          );                                                                   \
+      } else if constexpr (_nbytes == 3) {                                    \
+         auto&& b0 = std::get<0>(values);                                     \
+         auto&& b1 = std::get<1>(values);                                     \
+         auto&& b2 = std::get<2>(values);                                     \
+         asm volatile(                                                        \
+            "ldi r24, hi8(1b)\n\t"                                            \
+            "mov r22, %[b0]\n\t"                                              \
+            "mov r23, %[b1]\n\t"                                              \
+            "mov r20, %[b2]\n\t"                                              \
+            "call ulog_detail_emit24\n\t"                                     \
+            :: [b0] "r"(b0), [b1] "r"(b1), [b2] "r"(b2)                       \
+            : "r24", "r22", "r23", "r20"                                      \
+         );                                                                   \
       } else if constexpr (_nbytes == 4) {                                    \
          auto&& b0 = std::get<0>(values);                                     \
          auto&& b1 = std::get<1>(values);                                     \
