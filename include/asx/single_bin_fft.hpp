@@ -77,7 +77,6 @@ namespace asx {
          static inline index_t   w_inc      = 0;
          static inline index_t   w_index    = 0;
          static inline index_t   g_count    = 0;
-         static inline index_t   purge_count = 2 * FFT_N;
 
          /** Start a new FFT cycle */
          static void new_cycle() {
@@ -109,8 +108,16 @@ namespace asx {
             reset();
          }
 
-         static inline int16_t get_result() {
-            return static_cast<int16_t>(std::abs(x[FFT_H - 1]) / FFT_H);
+         static inline uint16_t get_result() {
+            // Compute the power
+            auto real = x[FFT_H - 1].real();
+            auto imag = x[FFT_H - 1].imag();
+
+            auto result = std::sqrt(real * real + imag * imag);
+
+            result /= FFT_H;
+
+            return static_cast<uint16_t>(result);
          }
 
          /**
@@ -152,19 +159,20 @@ namespace asx {
                   w_index += w_inc;
 
                   if (g_count == g_size) {
+                     // Double-up the group size
                      g_size >>= 1;
                      g_count = 0;
+
+                     // Next pass
                      w_index = 0;
                      w_inc <<= 1;
                   }
                } else {
+                  // Start again
                   new_cycle();
 
-                  if ( purge_count == 0 ) {
-                     return true;
-                  } else {
-                     --purge_count;
-                  }
+                  // Tell the caller the result is ready
+                  return true;
                }
             } else {
                ++i;
