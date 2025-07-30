@@ -32,7 +32,7 @@
 #include <asx/chrono.hpp>
 #include <asx/reactor.hpp>
 #include <asx/hw_timer.hpp>
-
+#include <asx/ulog.hpp>
 
 namespace asx {
    namespace modbus {
