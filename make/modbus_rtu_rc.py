@@ -45,8 +45,9 @@ TEMPLATE_CODE_MASTER="""#pragma once
  * This file was generated to create a state machine for processing
  * uart data used for a modbus RTU.
  */
-#include <stdint.h>
-#include <trace.h>
+#include <cstdint>
+
+#include <asx/ulog.hpp>
 #include <asx/modbus_rtu_master.hpp>
 
 namespace @NAMESPACE@ {
@@ -119,7 +120,7 @@ namespace @NAMESPACE@ {
         }
 
         static void process_char(const uint8_t c) noexcept {
-            TRACE_DEBUG(DG, "RX[%d]<%2x (%d)", cnt, c, (uint8_t)state);
+            ULOG_DEBUG("Received char: 0x{:2X} at position {}", c, cnt);
 
             if (state == state_t::IGNORE) {
                 return;
@@ -223,8 +224,8 @@ TEMPLATE_CODE_SLAVE="""#pragma once
  * uart data used for a modbus RTU. It should be included by
  * the modbus_rtu_slave.cpp file only which will create a full rtu slave device.
  */
-#include <stdint.h>
-#include <trace.h>
+#include <cstdint>
+#include <asx/ulog.hpp>
 #include <asx/modbus_rtu_slave.hpp>
 
 namespace @NAMESPACE@ {
@@ -237,6 +238,15 @@ namespace @NAMESPACE@ {
         ERROR = 1,
         @ENUMS@
     };
+
+    // Code 43 / 14 object category
+    enum class object_code_t : uint8_t {
+        BASIC_DEVICE_IDENTIFICATION = 0x01,
+        REGULAR_DEVICE_IDENTIFICATION = 0x02,
+        EXTENDED_DEVICE_IDENTIFICATION = 0x03,
+        SPECIFIC_DEVICE_IDENTIFICATION = 0x04
+    };
+
 
     class Datagram {
         using error_t = asx::modbus::error_t;
@@ -292,7 +302,7 @@ namespace @NAMESPACE@ {
         }
 
         static void process_char(const uint8_t c) noexcept {
-            TRACE_DEBUG(DG, "RX[%d]<%2x (%d)", cnt, c, (uint8_t)state);
+            ULOG_DEBUG0("Receive char: 0x{:2X} at position {}", cnt, c);
 
             if (state == state_t::IGNORE) {
                 return;
@@ -335,6 +345,10 @@ namespace @NAMESPACE@ {
                 buffer[cnt++] = value >> 8 & 0xff;
                 buffer[cnt++] = value & 0xff;
             }
+        }
+
+        static void pack(const char *v) noexcept {
+            memcpy(&buffer[cnt], v, strlen(v));
         }
 
         static inline void set_size(uint8_t size) {
@@ -380,7 +394,13 @@ namespace @NAMESPACE@ {
             return std::string_view{(char *)buffer, cnt};
         }
     }; // struct Processor
-} // namespace modbus"""
+
+    @SLAVE_ID_FUNCTION@
+
+    @SLAVE_READ_ID_REQUEST@
+
+    inline void on_diagnostics() {}
+} // namespace @NAMESPACE@"""
 
 # Regex to check the device address (and extract it)
 DEVICE_ADDR_RE = re.compile(r'device@((?:0x)?([0-9a-fA-F]+))')
@@ -566,7 +586,53 @@ WRITE_SINGLE_REGISTER         = u8(0x06, alias="WRITE_SINGLE_REGISTER")
 WRITE_MULTIPLE_COILS          = u8(0x0F, alias="WRITE_MULTIPLE_COILS")
 WRITE_MULTIPLE_REGISTERS      = u8(0x10, alias="WRITE_MULTIPLE_REGISTERS")
 READ_WRITE_MULTIPLE_REGISTERS = u8(0x17, alias="READ_WRITE_MULTIPLE_REGISTERS")
+REPORT_SLAVE_ID               = u8(0x11, alias="REPORT_SLAVE_ID")
+ENCAPSULATED_INTERFACE_TRANSPORT = u8(0x2B, alias="ENCAPSULATED_INTERFACE_TRANSPORT")
 CUSTOM                        = u8(0x65, alias="CUSTOM")
+
+READ_DEVICE_IDENTIFICATION    = u8(0x2B, alias="READ_DEVICE_IDENTIFICATION")
+
+# MEI Object Codes
+VENDOR_NAME = 0x00
+PRODUCT_CODE = 0x01
+MAJOR_MINOR_REVISION = 0x02
+VENDOR_URL = 0x03
+PRODUCT_NAME = 0x04
+MODEL_NAME = 0x05
+USER_APPLICATION_NAME = 0x06
+PRIVATE_OBJECTS_0 = 0x80
+PRIVATE_OBJECTS_1 = 0x81
+PRIVATE_OBJECTS_2 = 0x82
+PRIVATE_OBJECTS_3 = 0x83
+PRIVATE_OBJECTS_4 = 0x84
+PRIVATE_OBJECTS_5 = 0x85
+PRIVATE_OBJECTS_6 = 0x86
+PRIVATE_OBJECTS_7 = 0x87
+
+# MEI Classification Codes
+BASIC_DEVICE_IDENTIFICATION = 0x01
+REGULAR_DEVICE_IDENTIFICATION = 0x02
+EXTENDED_DEVICE_IDENTIFICATION = 0x03
+SPECIFIC_DEVICE_IDENTIFICATION = 0x04
+
+# Group of MEI Object Codes
+MEI_OBJECT_CATEGORY = {
+    VENDOR_NAME:           BASIC_DEVICE_IDENTIFICATION,
+    PRODUCT_CODE:          BASIC_DEVICE_IDENTIFICATION,
+    MAJOR_MINOR_REVISION:  BASIC_DEVICE_IDENTIFICATION,
+    VENDOR_URL:            REGULAR_DEVICE_IDENTIFICATION,
+    PRODUCT_NAME:          REGULAR_DEVICE_IDENTIFICATION,
+    MODEL_NAME:            REGULAR_DEVICE_IDENTIFICATION,
+    USER_APPLICATION_NAME: REGULAR_DEVICE_IDENTIFICATION,
+    PRIVATE_OBJECTS_0:     EXTENDED_DEVICE_IDENTIFICATION,
+    PRIVATE_OBJECTS_1:     EXTENDED_DEVICE_IDENTIFICATION,
+    PRIVATE_OBJECTS_2:     EXTENDED_DEVICE_IDENTIFICATION,
+    PRIVATE_OBJECTS_3:     EXTENDED_DEVICE_IDENTIFICATION,
+    PRIVATE_OBJECTS_4:     EXTENDED_DEVICE_IDENTIFICATION,
+    PRIVATE_OBJECTS_5:     EXTENDED_DEVICE_IDENTIFICATION,
+    PRIVATE_OBJECTS_6:     EXTENDED_DEVICE_IDENTIFICATION,
+    PRIVATE_OBJECTS_7:     EXTENDED_DEVICE_IDENTIFICATION,
+}
 
 
 class Transition:
@@ -813,6 +879,9 @@ class CodeGenerator:
         # Device ID. None for dynamic
         self.device_id = None
 
+        # The identification is optional and yields support for commands 17 and 43/14
+        self.identification = tree.get("identification", {})
+
         if "callbacks" not in tree:
             raise ParsingException("Callbacks are required")
 
@@ -827,6 +896,7 @@ class CodeGenerator:
 
         # Add space for the device address, the command and the CRC
         self.max_buf_size += 4
+
         # Overwrite with the configuration
         self.max_buf_size = max(self.max_buf_size, tree.get("buffer_size", 0))
 
@@ -841,6 +911,58 @@ class CodeGenerator:
 
         if "on_received" in tree:
             self.on_ready_reply_callback = tree["on_received"]
+
+        self.conformity_level = 0
+
+        if self.mode == "slave" and PRODUCT_CODE in self.identification:
+            if "device" not in tree:
+                raise ParsingException("identification requires a simple 'device' node")
+
+            # Insert the report slave ID function
+            tree["device"].append(
+                (
+                    u8(0x0B, alias="REPORT_SLAVE_ID"),
+                    "on_report_slave_id"
+                )
+            )
+
+            # Add the callback for the report slave ID
+            self.callbacks["on_report_slave_id"] = []
+
+            for keys in self.identification.keys():
+                if keys not in MEI_OBJECT_CATEGORY:
+                    raise ParsingException(f"Invalid identification key {keys} in {self.mode} mode")
+                self.conformity_level = max(self.conformity_level, MEI_OBJECT_CATEGORY[keys])
+
+            # Insert the report slave ID function
+            tree["device"].append(
+                (
+                    u8(0x2B, alias="ENCAPSULATED_INTERFACE_TRANSPORT"),
+                    u8(0x0E, alias="READ_DEVICE_IDENTIFICATION"),
+                    u8(0x01, 0x03, alias="READ_DEVICE_ID_CODE"),
+                    u8(alias="OBJECT_ID"),
+                    "on_read_device_identification"
+                )
+            )
+
+            # Add the callback for the read device identification
+            self.callbacks["on_read_device_identification"] = [
+                (u8, "device_id"),
+                (u8, "object_id"),
+            ]
+
+            # Insert the diagnostic function
+            tree["device"].append(
+                (
+                    u8(0x08, alias="DIAGNOSTICS"),
+                    u16(alias="SUBFUNCTION"),
+                    u16(alias="DATA"),
+                    "on_diagnostics"
+                )
+            )
+
+            # Add the callback for the diagnostic
+            self.callbacks["on_diagnostics"] = []
 
         self.process_devices(tree)
 
@@ -871,6 +993,8 @@ class CodeGenerator:
             "INCOMPLETE": self.get_incomplete_text(2),
             "PROTOTYPES" : self.get_prototypes(1),
             "READY_REPLY_CALLBACK": self.get_ready_reply_callback(1),
+            "SLAVE_ID_FUNCTION": self.get_report_slave_id_function(1),
+            "SLAVE_READ_ID_REQUEST": self.get_read_device_identification(1),
         }
 
         # Function to replace each placeholder
@@ -1058,6 +1182,115 @@ class CodeGenerator:
                     next_state = self.new_state(state.next(matcher.alias), state.pos + matcher.size)
                     state.add(Transition(matcher, next_state))
                     state = next_state
+
+    def get_report_slave_id_function(self, level):
+        # We need the product code as a minimum
+        if self.conformity_level == 0:
+            return ""
+
+        # Create the id using the MEI objects
+        id = self.identification[PRODUCT_CODE]
+
+        if MODEL_NAME in self.identification:
+            id += f"_{self.identification[MODEL_NAME]}"
+
+        # Append the function code
+
+
+        # Placeholder for actual implementation
+        tab = INDENT * level
+
+        return f"{tab}".join(["",
+            "\n/** Answer command 17 */\n",
+            "inline void on_report_slave_id() {\n",
+            "    Datagram::set_size(2); // Reset the count to 2 (ID + code)\n",
+            f"    Datagram::pack<uint8_t>({len(id)+2}); // Byte count\n",
+            "    Datagram::pack<uint8_t>(0xFF); // Status OK\n",
+            f"    Datagram::pack(\"{id}\"); // Function code\n",
+            "}"]
+        )
+
+    def get_read_device_identification(self, level):
+        # We need the product code as a minimum
+        if self.conformity_level == 0:
+            return ""
+
+        t0 = INDENT * (level)
+        t1 = INDENT * (level+1)
+        t2 = INDENT * (level+2)
+
+        def pack(code):
+            """ Helper function to pack the key into the code """
+            data = self.identification.get(code, "")
+
+            return t2.join(["",
+                f"Datagram::pack<uint8_t>(0x{key:02x}); // Object code\n",
+                f"Datagram::pack<uint8_t>({len(data)}); // Length of the object\n",
+                f"Datagram::pack(\"{data}\");\n"]
+            )
+
+        # Placeholder for actual implementation
+        retval = t0.join(["",
+            "/** Answer command 43/14 */\n",
+            " inline void on_read_device_identification(uint8_t device_id, uint8_t object_id) {\n",
+            "    Datagram::set_size(3); // Reset the count to 2 (ID + code)\n",
+            f"    Datagram::pack<uint8_t>({self.conformity_level}); // Conformity level\n",
+            "    Datagram::pack<uint8_t>(0); // No more to follow\n\n"
+        ])
+
+        all_objects = {}
+        device_id_count = {}
+
+        for key, identification in MEI_OBJECT_CATEGORY.items():
+            if identification <= self.conformity_level and key in self.identification:
+                all_objects.setdefault(identification, []).append(pack(key))
+                device_id_count.setdefault(identification, 0)
+                device_id_count[identification] += 1
+
+        if self.conformity_level == BASIC_DEVICE_IDENTIFICATION:
+            retval += t1.join(["",
+                "Datagram::pack<uint8_t>(0x03); // 3 objects\n",
+                *all_objects[BASIC_DEVICE_IDENTIFICATION]
+            ])
+        elif self.conformity_level == REGULAR_DEVICE_IDENTIFICATION:
+            retval += t1.join(["",
+                "if (device_id == 1) { // Device ID 1 has a fixed number of objects\n",
+                "   Datagram::pack<uint8_t>(0x03); // 3 objects\n",
+                "} else {\n",
+                f"   Datagram::pack<uint8_t>({3+device_id_count[REGULAR_DEVICE_IDENTIFICATION]}); // {3+device_id_count[REGULAR_DEVICE_IDENTIFICATION]} objects\n",
+                "}\n\n",
+                "if (device_id == 2) {\n",
+                *all_objects[BASIC_DEVICE_IDENTIFICATION],
+                "} else {\n",
+                *all_objects[BASIC_DEVICE_IDENTIFICATION],
+                "}\n",
+            ])
+        elif self.conformity_level == EXTENDED_DEVICE_IDENTIFICATION:
+            l1c = 3
+            l2c = device_id_count[REGULAR_DEVICE_IDENTIFICATION]
+            l3c = device_id_count[EXTENDED_DEVICE_IDENTIFICATION]
+
+            retval += t1.join(["",
+                f"if (device_id == 1) {{ // Device ID 1 has a fixed number of objects\n",
+                f"   Datagram::pack<uint8_t>({l1c}); // {l1c} objects\n",
+                "} else if (device_id == 2) {\n",
+                f"   Datagram::pack<uint8_t>({l1c+l2c}); // {l1c} + {l2c} objects\n",
+                "} else {\n",
+                f"   Datagram::pack<uint8_t>({l1c+l2c+l3c}); // {l1c} +  {l2c} + {l3c} objects\n",
+                "}\n\n",
+                "if (device_id == 1) {\n"
+            ])
+
+            retval += "".join(["", *all_objects[BASIC_DEVICE_IDENTIFICATION]])
+            retval += t1 + "} else if (device_id == 2) {\n"
+            retval += "".join(["", *all_objects[REGULAR_DEVICE_IDENTIFICATION]])
+            retval += t1 + "} else {\n"
+            retval += "".join(["", *all_objects[EXTENDED_DEVICE_IDENTIFICATION]])
+            retval += t1 + "}\n"
+
+        retval += t0.join(["","}\n"])
+
+        return retval
 
 if __name__ == "__main__":
     print("Call the using file")
