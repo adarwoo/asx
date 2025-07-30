@@ -218,32 +218,31 @@ namespace asx {
 
          static_assert(N < 2, "Invalid timer number");
 
-         static TCB_t * const get_timer() {
+         static constexpr TCB_t &TCB() {
             if constexpr (N == 0) {
-               return &TCB0;
+               return TCB0;
             }
 
-            return &TCB1;
+            return TCB1;
          }
 
          static void react_on_cmp( reactor::Handle reactor ) {
             on_timerb_compare = reactor;
             // Enable the interrupt
-            get_timer()->CTRLA |= TCB_ENABLE_bm;
+            TCB().CTRLA |= TCB_ENABLE_bm;
          }
 
-         // Variadic template function to set multiple compare registers
+         // Set the compare registers
          static constexpr void set_compare(const asx::chrono::cpu_tick_t duration) {
             // Set the timer prescaler
-            auto* timer = get_timer();
-            timer->CNT = 0;  // Reset the counter
+            TCB().CNT = 0;  // Reset the counter
 
             if (duration.count() < value_t::maximum) {
-               timer->CTRLA = TCB_CLKSEL_DIV1_gc;
-               timer->CCMP = duration.count();
+               TCB().CTRLA = TCB_CLKSEL_DIV1_gc;
+               TCB().CCMP = duration.count();
             } else {
-               timer->CTRLA = TCB_CLKSEL_DIV2_gc;
-               timer->CCMP = duration.count() >> 1;
+               TCB().CTRLA = TCB_CLKSEL_DIV2_gc;
+               TCB().CCMP = duration.count() >> 1;
             }
          }
 
