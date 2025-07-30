@@ -184,8 +184,6 @@ namespace asx {
             return std::tuple_cat(split_to_u8_tuple(std::forward<Args>(args))...);
          }
       }
-
-      void init();
    }
 }
 

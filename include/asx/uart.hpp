@@ -196,6 +196,10 @@ namespace asx {
          static constexpr void disable_rx() {
             get().CTRLB &= ~USART_RXEN_bm;
          }
+         
+         static bool tx_ready() {
+            return (get().CTRLA & USART_DREIE_bm) == 0;
+         }
 
          static void send(const std::string_view view_to_send) {
             // Store the view to transmit

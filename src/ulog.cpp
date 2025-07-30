@@ -1,6 +1,6 @@
 #include <interrupt.h>
 
-#include <span>
+#include <string_view>
 
 #include <asx/uart.hpp>
 #include <asx/ulog.hpp>
@@ -120,7 +120,6 @@ namespace asx {
 
       // Scratch buffer for encoded output. Worse case - The payload(COBS adds +2 overhead worse case)
       static uint8_t tx_encoded[sizeof(LogPacket::data) + 2];
-      static std::span<const uint8_t> to_send;
 
       // COBS encoder: encodes input into output, returns encoded length
       static uint8_t cobs_encode(const uint8_t* input, uint8_t length) {
@@ -156,18 +155,15 @@ namespace asx {
        */
       static void start_tx_if_needed() {
          // Avoid race condition since an interrupt could be logging
-         auto save_flags =  cpu_irq_save();
+         auto save_flags = cpu_irq_save();
 
-         if (to_send.empty() and log_tail != log_head) {
+         if (uart::tx_ready() and log_tail != log_head) {
             // Data to send
             LogPacket& pkt = log_buffer[log_tail];
             log_tail = (log_tail + 1) % BUF_SIZE;
 
             uint8_t encoded_len = cobs_encode(pkt.data, pkt.len);
-            to_send = std::span<const uint8_t>(tx_encoded, encoded_len);
-
-            // Enable DRE interrupt
-            uart::get().CTRLA |= USART_DREIE_bm;
+            uart::send( std::string_view((char *)tx_encoded, encoded_len) );
          }
 
          // Restore SREG
@@ -175,28 +171,18 @@ namespace asx {
       }
 
       // Self initialise very early on to allow all to use
-      //void __attribute__ ((section (".init0"), naked, used))
-      void init() {
+      void __attribute__((constructor))  // Ensure this runs before main
+      __attribute__((used))  // Ensure the compiler does not optimize this out
+      init() {
          uart::init();
          uart::disable_rx();
          uart::get().CTRLA = 0; // No interrupt at this stage
 
          // Register the reactor
          react_to_initiate_transmit = asx::reactor::bind(start_tx_if_needed);
-      }
-
-      // There is space in the buffer
-      ISR(USART0_DRE_vect) {
-         if ( not to_send.empty() ) {
-            uart::get().TXDATAL = to_send.front();
-            to_send = to_send.subspan(1);
-         } else {
-            // Disable all interrupts
-            uart::get().CTRLA = 0;
-
-            // Check for pending sends to encode and start transmitting
-            asx::reactor::notify_from_isr(react_to_initiate_transmit);
-         }
+         
+         // Get it called when the Tx buffer is available
+         uart::react_on_send_complete(react_to_initiate_transmit);
       }
    }
 }
