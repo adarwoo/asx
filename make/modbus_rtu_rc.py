@@ -251,7 +251,7 @@ namespace @NAMESPACE@ {
     class Datagram {
         using error_t = asx::modbus::error_t;
 
-        @DEVICE_ID@
+        @DEVICE_ADDRESS@
         ///< Adjusted buffer to only receive the largest amount of data possible
         inline static uint8_t buffer[@BUFSIZE@];
         ///< Number of characters in the buffer
@@ -285,7 +285,7 @@ namespace @NAMESPACE@ {
             BAD_CRC = 2
         };
 
-        @SET_DEVICE_ID@
+        @set_device_address@
         static void reset() noexcept {
             cnt=0;
             crc.reset();
@@ -348,7 +348,9 @@ namespace @NAMESPACE@ {
         }
 
         static void pack(const char *v) noexcept {
-            memcpy(&buffer[cnt], v, strlen(v));
+            auto length = strlen(v);
+            memcpy(&buffer[cnt], v, length);
+            cnt += length;
         }
 
         static inline void set_size(uint8_t size) {
@@ -573,9 +575,9 @@ class Crc(UnsignedMatcher, _16bits):
     _bits = -16 # Negative for little endian
     def to_code(self):
         return "true"
-class RuntimeDeviceId(UnsignedMatcher, _8bits):
+class RuntimeDeviceAddress(UnsignedMatcher, _8bits):
     def to_code(self):
-        return "c == device_id";
+        return "c == device_address";
 
 READ_COILS                    = u8(0x01, alias="READ_COILS")
 READ_DISCRETE_INPUTS          = u8(0x02, alias="READ_DISCRETE_INPUTS")
@@ -608,6 +610,8 @@ PRIVATE_OBJECTS_4 = 0x84
 PRIVATE_OBJECTS_5 = 0x85
 PRIVATE_OBJECTS_6 = 0x86
 PRIVATE_OBJECTS_7 = 0x87
+# Non MEI object code
+SLAVE_ID = 0xFF07
 
 # MEI Classification Codes
 BASIC_DEVICE_IDENTIFICATION = 0x01
@@ -877,10 +881,13 @@ class CodeGenerator:
         # Specific callbacks
         self.on_ready_reply_callback = None
         # Device ID. None for dynamic
-        self.device_id = None
+        self.device_address = None
 
         # The identification is optional and yields support for commands 17 and 43/14
         self.identification = tree.get("identification", {})
+
+        # Device ID
+        self.slave_id = tree.get("slave_id", 0xFF)
 
         if "callbacks" not in tree:
             raise ParsingException("Callbacks are required")
@@ -888,7 +895,7 @@ class CodeGenerator:
         self.process_callbacks(tree["callbacks"])
 
         for key, value in tree.items():
-            if key.startswith("device"):
+            if re.match(r"^device(@\d+)?$", key):
                 for cmd in value:
                     self.max_buf_size = max(self.max_buf_size,
                         sum(item.size for item in cmd if isinstance(item, Integral))
@@ -921,7 +928,7 @@ class CodeGenerator:
             # Insert the report slave ID function
             tree["device"].append(
                 (
-                    u8(0x0B, alias="REPORT_SLAVE_ID"),
+                    u8(0x11, alias="REPORT_SLAVE_ID"),
                     "on_report_slave_id"
                 )
             )
@@ -983,8 +990,8 @@ class CodeGenerator:
 
     def generate_code(self):
         placeholders = {
-            "DEVICE_ID" : self.get_device_id(2),
-            "SET_DEVICE_ID" : self.set_device_id(2),
+            "DEVICE_ADDRESS" : self.get_device_address(2),
+            "set_device_address" : self.set_device_address(2),
             "BUFSIZE" : str(self.max_buf_size),
             "NAMESPACE" : self.namespace,
             "ENUMS" : self.get_enums_text(2),
@@ -1010,21 +1017,21 @@ class CodeGenerator:
 
         return re.sub(r"(\s*)@(.*?)@(\n?)", replace_placeholder, template )
 
-    def get_device_id(self, indent):
+    def get_device_address(self, indent):
         tab = INDENT * indent
 
-        if self.device_id is None:
-            return f"""///< Runtime ID. Set-up before starting the modbus\n{tab}inline static uint8_t device_id = 255;"""
+        if self.device_address is None:
+            return f"""///< Runtime ID. Set-up before starting the modbus\n{tab}inline static uint8_t device_address = 255;"""
 
-        return f"""///< Device ID\n{tab}static constexpr auto device_id = uint8_t{self.device_id}"""
+        return f"""///< Device ID\n{tab}static constexpr auto device_address = uint8_t{self.device_address}"""
 
-    def set_device_id(self, indent):
-        if self.device_id is None:
+    def set_device_address(self, indent):
+        if self.device_address is None:
             tab = INDENT * indent
 
-            return "///< Set the device ID\n" + \
-                f"{tab}static inline void set_device_id(uint8_t new_id) {{\n" + \
-                f"{tab}{INDENT}device_id = new_id;\n" + \
+            return "///< Set the device address\n" + \
+                f"{tab}static inline void set_device_address(uint8_t new_address) {{\n" + \
+                f"{tab}{INDENT}device_address = new_address;\n" + \
                 f"{tab}}}"
 
         return ""
@@ -1116,7 +1123,7 @@ class CodeGenerator:
         for key, value in tree.items():
             if key == "device": # No ID attached - runtime ID
                 device_state = self.new_state(f"DEVICE", 1)
-                address_matcher = RuntimeDeviceId(alias=device_state.name)
+                address_matcher = RuntimeDeviceAddress(alias=device_state.name)
                 current_state.add(Transition(address_matcher, device_state))
                 for command in value:
                     self.process_sequence(address_matcher, device_state, command)
@@ -1127,13 +1134,13 @@ class CodeGenerator:
                 if not match:
                     raise ParsingException("Malformed device address")
 
-                self.device_id = int(match.group(1), 0)
+                self.device_address = int(match.group(1), 0)
 
-                if self.device_id > 254:
+                if self.device_address > 254:
                     raise ParsingException("device address must be <= 254")
 
-                device_state = self.new_state(f"DEVICE_{self.device_id}", 1)
-                address_matcher = u8(self.device_id, alias=device_state.name)
+                device_state = self.new_state(f"DEVICE_{self.device_address}", 1)
+                address_matcher = u8(self.device_address, alias=device_state.name)
                 current_state.add(Transition(address_matcher, device_state))
 
                 for command in value:
@@ -1194,17 +1201,15 @@ class CodeGenerator:
         if MODEL_NAME in self.identification:
             id += f"_{self.identification[MODEL_NAME]}"
 
-        # Append the function code
-
-
         # Placeholder for actual implementation
         tab = INDENT * level
 
         return f"{tab}".join(["",
-            "\n/** Answer command 17 */\n",
+            "\n/** Answer command 17 - Report slave id */\n",
             "inline void on_report_slave_id() {\n",
             "    Datagram::set_size(2); // Reset the count to 2 (ID + code)\n",
             f"    Datagram::pack<uint8_t>({len(id)+2}); // Byte count\n",
+            f"    Datagram::pack<uint8_t>({self.slave_id}); // slave ID\n",
             "    Datagram::pack<uint8_t>(0xFF); // Status OK\n",
             f"    Datagram::pack(\"{id}\"); // Function code\n",
             "}"]
