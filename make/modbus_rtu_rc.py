@@ -1238,9 +1238,10 @@ class CodeGenerator:
         retval = t0.join(["",
             "/** Answer command 43/14 */\n",
             " inline void on_read_device_identification(uint8_t device_id, uint8_t object_id) {\n",
-            "    Datagram::set_size(3); // Reset the count to 2 (ID + code)\n",
+            "    Datagram::set_size(4); // Reset the count to 4 (addr/func/mei_type/DevId)\n",
             f"    Datagram::pack<uint8_t>({self.conformity_level}); // Conformity level\n",
             "    Datagram::pack<uint8_t>(0); // No more to follow\n\n"
+            "    Datagram::pack<uint8_t>(0); // Next object ID\n\n"
         ])
 
         all_objects = {}
@@ -1264,14 +1265,14 @@ class CodeGenerator:
                 "} else {\n",
                 f"   Datagram::pack<uint8_t>({3+device_id_count[REGULAR_DEVICE_IDENTIFICATION]}); // {3+device_id_count[REGULAR_DEVICE_IDENTIFICATION]} objects\n",
                 "}\n\n",
-                "if (device_id == 2) {\n",
+                "if (device_id == 1) {\n",
                 *all_objects[BASIC_DEVICE_IDENTIFICATION],
                 "} else {\n",
-                *all_objects[BASIC_DEVICE_IDENTIFICATION],
+                *all_objects[REGULAR_DEVICE_IDENTIFICATION],
                 "}\n",
             ])
         elif self.conformity_level == EXTENDED_DEVICE_IDENTIFICATION:
-            l1c = 3
+            l1c = device_id_count[BASIC_DEVICE_IDENTIFICATION]
             l2c = device_id_count[REGULAR_DEVICE_IDENTIFICATION]
             l3c = device_id_count[EXTENDED_DEVICE_IDENTIFICATION]
 
@@ -1283,13 +1284,15 @@ class CodeGenerator:
                 "} else {\n",
                 f"   Datagram::pack<uint8_t>({l1c+l2c+l3c}); // {l1c} +  {l2c} + {l3c} objects\n",
                 "}\n\n",
-                "if (device_id == 1) {\n"
+                "if (device_id >= 1) {\n"
             ])
 
             retval += "".join(["", *all_objects[BASIC_DEVICE_IDENTIFICATION]])
-            retval += t1 + "} else if (device_id == 2) {\n"
+            retval += t1 + "}\n\n"
+            retval += t1 + "if (device_id >= 2) {\n"
             retval += "".join(["", *all_objects[REGULAR_DEVICE_IDENTIFICATION]])
-            retval += t1 + "} else {\n"
+            retval += t1 + "}\n\n"
+            retval += t1 + "if (device_id == 3) {\n"
             retval += "".join(["", *all_objects[EXTENDED_DEVICE_IDENTIFICATION]])
             retval += t1 + "}\n"
 
