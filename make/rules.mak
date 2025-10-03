@@ -1,14 +1,14 @@
 .PHONY: clean all shell
 
 # Check if running inside Docker
-SWITCH_TO_DOCKER:=$(if $(wildcard /.dockerenv_asx),no,yes)
+SWITCH_TO_CONTAINER:=$(if $(wildcard /.dockerenv_asx),no,yes)
 
 # For AVR Studio, build
 ifdef ToolchainDir
-SWITCH_TO_DOCKER:=no
+SWITCH_TO_CONTAINER:=no
 endif
 
-ifeq ($(SWITCH_TO_DOCKER),yes)
+ifeq ($(SWITCH_TO_CONTAINER),yes)
 # Find the directory of this file (b.mak)
 CURRENT_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 ASX_DIR := $(dir $(abspath $(CURRENT_MAKEFILE)/..))
@@ -17,15 +17,25 @@ ASX_DIR := $(dir $(abspath $(CURRENT_MAKEFILE)/..))
 space := $(empty) $(empty)
 
 # Not in Docker, respawn inside Docker
-DOCKER_RUN_CMD := $(ASX_DIR)buildenv make
+CONTAINER_RUN_CMD := $(ASX_DIR)buildenv make
 CMD_VARS=$(strip \
 	$(foreach var,$(.VARIABLES), $(if $(filter command line, $(origin $(var))),$(var)=$($(var)))))
 
-all $(filter-out all shell, $(MAKECMDGOALS)):
-	@$(DOCKER_RUN_CMD) $@ $(CMD_VARS)
+all $(filter-out all shell prog, $(MAKECMDGOALS)):
+	@$(CONTAINER_RUN_CMD) $@ $(CMD_VARS)
 
 shell:
 	@$(ASX_DIR)/buildenv
+
+build_type ?= $(if $(NDEBUG),Release,Debug)
+BUILD_DIR       ?= $(build_type)
+AVRDUDE := /mnt/e/opt/avr-dude/avrdude.exe
+PROGRAMMER := atmelice_updi
+PORT := usb
+
+prog : $(BUILD_DIR)/$(BIN).hex
+	@echo Programming $(BIN). Reset the device after programming.
+	$(MUTE)$(AVRDUDE) -p $(ARCH) -c $(PROGRAMMER) -P $(PORT) -U flash:w:$(BUILD_DIR)/$(BIN).hex:i
 else
 
 # By default, build for the AVR target. Export sim to build a simulator
@@ -177,4 +187,4 @@ help:
 	@echo "Rules are: all, clean"
 	@echo "Trace: Set the variable trace={error,warn,mile,info,debug} and dom={<dom0>,<dom1>...}"
 
-endif # SWITCH_TO_DOCKER
+endif # SWITCH_TO_CONTAINER

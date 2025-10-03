@@ -62,14 +62,14 @@ namespace {
 // C Linkage functions called from the inline assembly
 // ----------------------------------------------------------------------
 
-extern "C" void ulog_detail_emit0(uint8_t id) {
+extern "C" void ulog_detail_enqueue(uint8_t id) {
    if (LogPacket* dst = reserve_log_packet()) {
       dst->data[0] = id;
       dst->len = 1;
    }
 }
 
-extern "C" void ulog_detail_emit8(uint8_t id, uint8_t v0) {
+extern "C" void ulog_detail_enqueue_1(uint8_t id, uint8_t v0) {
    if (LogPacket* dst = reserve_log_packet()) {
       dst->data[0] = id;
       dst->data[1] = v0;
@@ -77,7 +77,7 @@ extern "C" void ulog_detail_emit8(uint8_t id, uint8_t v0) {
    }
 }
 
-extern "C" void ulog_detail_emit16(uint8_t id, uint16_t v) {
+extern "C" void ulog_detail_enqueue_2(uint8_t id, uint16_t v) {
    if (LogPacket* dst = reserve_log_packet()) {
       dst->data[0] = id;
       dst->data[1] = v & 0xFF;
@@ -86,7 +86,7 @@ extern "C" void ulog_detail_emit16(uint8_t id, uint16_t v) {
    }
 }
 
-extern "C" void ulog_detail_emit24(uint8_t id, uint8_t v0, uint8_t v1, uint8_t v2) {
+extern "C" void ulog_detail_enqueue_3(uint8_t id, uint8_t v0, uint8_t v1, uint8_t v2) {
    if (LogPacket* dst = reserve_log_packet()) {
       dst->data[0] = id;
       dst->data[1] = v0;
@@ -96,7 +96,7 @@ extern "C" void ulog_detail_emit24(uint8_t id, uint8_t v0, uint8_t v1, uint8_t v
    }
 }
 
-extern "C" void ulog_detail_emit32(uint8_t id, uint32_t v) {
+extern "C" void ulog_detail_enqueue_4(uint8_t id, uint32_t v) {
    if (LogPacket* dst = reserve_log_packet()) {
       dst->data[0] = id;
       dst->data[1] = v & 0xFF;
@@ -180,7 +180,7 @@ namespace asx {
 
          // Register the reactor
          react_to_initiate_transmit = asx::reactor::bind(start_tx_if_needed);
-         
+
          // Get it called when the Tx buffer is available
          uart::react_on_send_complete(react_to_initiate_transmit);
       }

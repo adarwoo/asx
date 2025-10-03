@@ -2,25 +2,26 @@
 readonly image=asx:latest
 readonly hostname_=asx
 
+
 # Running in a TTY?
 test -t 1 && USE_TTY="-it"
 
 # Exit with error on interrupt, or failure
 set -e
 
-# Check docker is installed
-if ! which docker >& /dev/null; then
-   echo "Could not find 'docker'. You must install  docker first"
+# Variables
+this_dir=$(cd -P $(dirname $0) ; pwd)
+
+# Check podman is installed
+if ! which podman >& /dev/null; then
+   echo "Could not find 'podman'. You must install podman first"
    exit
 fi
 
-# If the docker image does not yet exists, build it
-if (($(docker images -q $image | wc -l) == 0)); then
-   docker build -t $image . || { echo "Failed to build the docker image"; exit; }
+# If the container image does not yet exists, build it
+if (($(podman images -q $image | wc -l) == 0)); then
+   podman build -t $image $this_dir || { echo "Failed to build the container image"; exit; }
 fi
-
-# Variables
-this_dir=$(cd -P $(dirname $0) ; pwd)
 
 if [[ $(realpath $PWD) == $(realpath ${this_dir})* ]]; then
    mountdir=$(realpath ${this_dir})
@@ -28,7 +29,7 @@ else
    mountdir=$(realpath ${this_dir}/..)
 fi
 
-base_opts="-u $(id -u $USER):$(getent group docker | cut -d: -f3) -v ${mountdir}:${mountdir}"
+base_opts="-u $(id -u $USER):$(getent group podman | cut -d: -f3) -v ${mountdir}:${mountdir}"
 workdir="$(realpath $(pwd))"
 
 [ -n "$SIM" ] && env_opt+="-e SIM=1"
@@ -43,17 +44,17 @@ else
    core_count=$(nproc)
 fi
 
-# Force a build of the docker
+# Force a build of the container image
 if [[ "$1" == "build" ]]; then
    cd $this_dir
-   docker build -t $image . || { echo "Failed to build the docker image"; exit; }
+   podman build -t $image . || { echo "Failed to build the container image"; exit; }
    exit
 fi
 
 # Run make or start a shell
 if [[ $1 == "make" ]]; then
    shift
-   docker run ${USE_TTY} --rm --init --name $container_name $env_opt -h $hostname_ $base_opts -w $workdir $image make -j$core_count $@
+   podman run ${USE_TTY} --rm --init --name $container_name $env_opt -h $hostname_ $base_opts -w $workdir $image make -j$core_count $@
 else
-   docker run ${USE_TTY} --rm --init --name $container_name $env_opt $xoptions -h $hostname_ $base_opts -w $workdir $image $@
+   podman run ${USE_TTY} --rm --init --name $container_name $env_opt $xoptions -h $hostname_ $base_opts -w $workdir $image $@
 fi

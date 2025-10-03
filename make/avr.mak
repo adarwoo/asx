@@ -6,6 +6,12 @@
 CXX := avr-g++
 CC := avr-gcc
 SIZE := avr-size
+AVRDUDE := /mnt/e/opt/avr-dude/avrdude
+OBJCOPY := avr-objcopy
+
+# AVR-Dude programmer settings
+PROGRAMMER := atmelice_updi
+PORT := usb
 
 # Pack for the toolchain
 PACK_VERSION = 2.0.368

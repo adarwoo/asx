@@ -188,19 +188,14 @@ namespace asx {
 }
 
 
-// Forwarding "C" linkage prototypes
-extern "C" void ulog_detail_emit0(uint8_t id);
-extern "C" void ulog_detail_emit8(uint8_t id, uint8_t v0);
-extern "C" void ulog_detail_emit16(uint8_t id, uint16_t v);
-extern "C" void ulog_detail_emit32(uint8_t id, uint32_t v);
-
 #define ULOG(level, fmt, ...)                                                 \
 do {                                                                          \
    constexpr uint8_t _level = static_cast<uint8_t>(level);                    \
    [&]<typename... Args>(Args&&... args) {                                    \
       constexpr uint32_t _typecode = ::asx::ulog::detail::encode_traits<Args...>();\
-      auto values = ::asx::ulog::detail::pack_bytes_to_tuple(args...);             \
+      auto values = ::asx::ulog::detail::pack_bytes_to_tuple(args...);        \
       constexpr size_t _nbytes = std::tuple_size<decltype(values)>::value;    \
+      uint8_t id;                                                             \
       asm volatile(                                                           \
          ".pushsection .logs,\"\",@progbits\n\t"                              \
          ".balign 256\n\t"                                                    \
@@ -216,15 +211,17 @@ do {                                                                          \
       if constexpr (_nbytes == 0) {                                           \
          asm volatile(                                                        \
             "ldi r24, hi8(1b)\n\t"                                            \
-            "call ulog_detail_emit0\n\t"                                      \
+            "call ulog_detail_enqueue\n\t"                                    \
             ::: "r24"                                                         \
          );                                                                   \
       } else if constexpr (_nbytes == 1) {                                    \
          auto&& value = std::get<0>(values);                                  \
          asm volatile(                                                        \
             "ldi r24, hi8(1b)\n\t"                                            \
+            "push r22\n\t"                                                    \
             "mov r22, %[value]\n\t"                                           \
-            "call ulog_detail_emit8\n\t"                                      \
+            "call ulog_detail_enqueue_1\n\t"                                  \
+            "pop r22\n\t"                                                    \
             :: [value] "r"(value)                                             \
             : "r24", "r22"                                                    \
          );                                                                   \
@@ -233,9 +230,13 @@ do {                                                                          \
          auto&& b1 = std::get<1>(values);                                     \
          asm volatile(                                                        \
             "ldi r24, hi8(1b)\n\t"                                            \
+            "push r22\n\t"                                                    \
+            "push r23\n\t"                                                    \
             "mov r22, %[b0]\n\t"                                              \
             "mov r23, %[b1]\n\t"                                              \
-            "call ulog_detail_emit16\n\t"                                     \
+            "call ulog_detail_enqueue_2\n\t"                                  \
+            "pop r23\n\t"                                                     \
+            "pop r22\n\t"                                                     \
             :: [b0] "r"(b0), [b1] "r"(b1)                                     \
             : "r24", "r23", "r22"                                             \
          );                                                                   \
@@ -245,10 +246,16 @@ do {                                                                          \
          auto&& b2 = std::get<2>(values);                                     \
          asm volatile(                                                        \
             "ldi r24, hi8(1b)\n\t"                                            \
+            "push r20\n\t"                                                    \
+            "push r22\n\t"                                                    \
+            "push r23\n\t"                                                    \
             "mov r22, %[b0]\n\t"                                              \
             "mov r23, %[b1]\n\t"                                              \
             "mov r20, %[b2]\n\t"                                              \
-            "call ulog_detail_emit24\n\t"                                     \
+            "call ulog_detail_enqueue_3\n\t"                                  \
+            "pop r23\n\t"                                                     \
+            "pop r22\n\t"                                                     \
+            "pop r20\n\t"                                                     \
             :: [b0] "r"(b0), [b1] "r"(b1), [b2] "r"(b2)                       \
             : "r24", "r22", "r23", "r20"                                      \
          );                                                                   \
@@ -259,11 +266,19 @@ do {                                                                          \
          auto&& b3 = (_nbytes > 3) ? std::get<3>(values) : 0;                 \
          asm volatile(                                                        \
             "ldi r24, hi8(1b)\n\t"                                            \
+            "push r20\n\t"                                                    \
+            "push r21\n\t"                                                    \
+            "push r22\n\t"                                                    \
+            "push r23\n\t"                                                    \
             "mov r20, %[b0]\n\t"                                              \
             "mov r21, %[b1]\n\t"                                              \
             "mov r22, %[b2]\n\t"                                              \
             "mov r23, %[b3]\n\t"                                              \
-            "call ulog_detail_emit32\n\t"                                     \
+            "call ulog_detail_enqueue_4\n\t"                                  \
+            "pop r23\n\t"                                                     \
+            "pop r22\n\t"                                                     \
+            "pop r21\n\t"                                                     \
+            "pop r20\n\t"                                                     \
             :: [b0] "r"(b0), [b1] "r"(b1), [b2] "r"(b2), [b3] "r"(b3)         \
             : "r24", "r20", "r21", "r22", "r23"                               \
          );                                                                   \

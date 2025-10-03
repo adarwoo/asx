@@ -29,10 +29,10 @@ extern "C" {
 #define ULOG_TYPE_TRAIT_FLOAT 0x42
 
 // Forwarding prototypes
-void ulog_detail_emit0(uint8_t id);
-void ulog_detail_emit8(uint8_t id, uint8_t v0);
-void ulog_detail_emit16(uint8_t id, uint16_t v);
-void ulog_detail_emit32(uint8_t id, uint32_t v);
+void ulog_detail_enqueue(uint8_t id);
+void ulog_detail_enqueue_1(uint8_t id, uint8_t v0);
+void ulog_detail_enqueue_2(uint8_t id, uint16_t v);
+void ulog_detail_enqueue_4(uint8_t id, uint32_t v);
 
 #define ULOG0(_level, fmt)                                                     \
 do {                                                                          \
@@ -50,7 +50,7 @@ do {                                                                          \
       );                                                                      \
       asm volatile(                                                           \
          "ldi r24, hi8(1b)\n\t"                                               \
-         "call ulog_detail_emit0\n\t"                                         \
+         "call ulog_detail_enqueue\n\t"                                         \
          ::: "r24"                                                            \
       );                                                                      \
    } while(0)
@@ -72,7 +72,7 @@ do {                                                                          \
       asm volatile(                                                           \
          "ldi r24, hi8(1b)\n\t"                                               \
          "mov r22, %[value]\n\t"                                              \
-         "call ulog_detail_emit8\n\t"                                         \
+         "call ulog_detail_enqueue_1\n\t"                                         \
          :: [value] "r"(value)                                                \
          : "r24", "r22"                                                       \
       );                                                                      \
@@ -95,7 +95,7 @@ do {                                                                          \
       asm volatile(                                                           \
          "ldi r24, hi8(1b)\n\t"                                               \
          "movw r22, %[value]\n\t"                                             \
-         "call ulog_detail_emit16\n\t"                                        \
+         "call ulog_detail_enqueue_2\n\t"                                        \
          :: [value] "r"(value)                                                \
          : "r24", "r23", "r22"                                                \
       );                                                                      \
