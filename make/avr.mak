@@ -45,14 +45,9 @@ define PRE_LINK
 		/SECTIONS/ { in_sections = 1 } \
 		in_sections && /^\s*{/ && !inserted { \
 			print; \
-			print "  .logs (NOLOAD) :"; \
+			print "  .logs () :"; \
 			print "  {"; \
 			print "    KEEP(*(.logs))"; \
-			print "  } > logmeta"; \
-			print ""; \
-			print "  .logstr (NOLOAD) :"; \
-			print "  {"; \
-			print "    KEEP(*(.logstr))"; \
 			print "  } > logmeta"; \
 			print ""; \
 			inserted = 1; \
