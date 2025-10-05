@@ -517,17 +517,6 @@ void ulog_detail_enqueue_4(uint8_t id, uint8_t v0, uint8_t v1, uint8_t v2, uint8
 #  endif
 #endif
 
-#define ULOG_ERROR(text, ...)      ULOG(ULOG_LEVEL_ERROR, text, ##__VA_ARGS__)
-#define ULOG_WARN(text, ...)       ULOG(ULOG_LEVEL_WARN, text, ##__VA_ARGS__)
-#define ULOG_MILE(text, ...)       ULOG(ULOG_LEVEL_MILE, text, ##__VA_ARGS__)
-#define ULOG_INFO(text, ...)       ULOG(ULOG_LEVEL_INFO, text, ##__VA_ARGS__)
-#define ULOG_TRACE(text, ...)      ULOG(ULOG_LEVEL_TRACE, text, ##__VA_ARGS__)
-#define ULOG_DEBUG0(text, ...)     ULOG(ULOG_LEVEL_DEBUG0, text, ##__VA_ARGS__)
-#define ULOG_DEBUG1(text, ...)     ULOG(ULOG_LEVEL_DEBUG1, text, ##__VA_ARGS__)
-#define ULOG_DEBUG2(text, ...)     ULOG(ULOG_LEVEL_DEBUG2, text, ##__VA_ARGS__)
-#define ULOG_DEBUG3(text, ...)     ULOG(ULOG_LEVEL_DEBUG3, text, ##__VA_ARGS__)
-
-#if 0
 #if ULOG_LEVEL >= ULOG_LEVEL_ERROR
   #define ULOG_ERROR(text, ...)       ULOG(ULOG_LEVEL_ERROR, text, ##__VA_ARGS__)
 #else
@@ -581,7 +570,7 @@ void ulog_detail_enqueue_4(uint8_t id, uint8_t v0, uint8_t v1, uint8_t v2, uint8
 #else
   #define ULOG_DEBUG3(text, ...)      do {} while (0)
 #endif
-#endif // 0
+
 #ifdef __cplusplus
 }
 #endif
