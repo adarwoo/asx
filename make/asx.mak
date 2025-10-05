@@ -41,16 +41,15 @@ endef
 
 # Define dependencies and source files for each module
 DEPOF_timer       := reactor timer.c
-DEPOF_modbus_rtu  := hw_timer reactor timer uart logger modbus_rtu.cpp ulog
+DEPOF_modbus_rtu  := hw_timer reactor timer uart modbus_rtu.cpp ulog
 DEPOF_pca9555     := i2c_master pca9555.cpp
-DEPOF_i2c_master  := reactor timer logger i2c_master.cpp
+DEPOF_i2c_master  := reactor timer i2c_master.cpp
 DEPOF_reactor     := reactor.c
 DEPOF_hw_timer    := hw_timer.cpp
 DEPOF_uart        := uart.cpp
-DEPOF_logger      := logger
 DEPOF_piezzo      := piezzo.c
 DEPOF_eeprom      := eeprom.cpp
-DEPOF_ulog        := ulog.c
+DEPOF_ulog        := ulog.c reactor uart
 
 ASX_FILES 			:= $(sort $(call resolve_deps,$(ASX_USE)))
 
