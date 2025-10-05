@@ -63,32 +63,20 @@
 
 namespace asx {
    namespace ulog {
-      enum Level : uint8_t {
-         error = 0,
-         warn,
-         mile,
-         trace,
-         info,
-         debug0,
-         debug1,
-         debug2,
-         debug3
-      };
-
       namespace detail {
          /** Value to pack for the argument trait */
          enum class ArgTrait : uint8_t {
-            none = 0,
-            u8 = 0x10,
-            s8 = 0x11,
-            b8 = 0x12,
-            u16 = 0x20,
-            s16 = 0x21,
-            ptr16 = 0x22,
-            u32 = 0x40,
-            s32 = 0x41,
-            float32 = 0x42,
-            str4 = 0x43
+            none    = ULOG_TYPE_TRAIT_NONE,
+            u8      = ULOG_TYPE_TRAIT_U8,
+            s8      = ULOG_TYPE_TRAIT_S8,
+            b8      = ULOG_TYPE_TRAIT_BOOL,
+            u16     = ULOG_TYPE_TRAIT_U16,
+            s16     = ULOG_TYPE_TRAIT_S16,
+            ptr16   = ULOG_TYPE_TRAIT_PTR,
+            u32     = ULOG_TYPE_TRAIT_U32,
+            s32     = ULOG_TYPE_TRAIT_S32,
+            float32 = ULOG_TYPE_TRAIT_FLOAT,
+            str4    = ULOG_TYPE_TRAIT_STR4
          };
 
          template <typename T>
@@ -183,10 +171,9 @@ namespace asx {
 
             return std::tuple_cat(split_to_u8_tuple(std::forward<Args>(args))...);
          }
-      }
-   }
-}
-
+      } // namespace detail
+   } // namespace ulog
+} // namespace asx
 
 #define ULOG(level, fmt, ...)                                                 \
 do {                                                                          \
@@ -195,171 +182,43 @@ do {                                                                          \
       constexpr uint32_t _typecode = ::asx::ulog::detail::encode_traits<Args...>();\
       auto values = ::asx::ulog::detail::pack_bytes_to_tuple(args...);        \
       constexpr size_t _nbytes = std::tuple_size<decltype(values)>::value;    \
-      uint8_t id;                                                             \
+      static_assert(_nbytes <= 4, "ULOG supports up to 4 bytes of payload");  \
+      register uint8_t id asm("r24");                                         \
       asm volatile(                                                           \
          ".pushsection .logs,\"\",@progbits\n\t"                              \
          ".balign 256\n\t"                                                    \
          "1:\n\t"                                                             \
-         ".byte %0\n\t"                                                       \
-         ".long %1\n\t"                                                       \
+         ".byte %1\n\t"                                                       \
          ".long %2\n\t"                                                       \
-         ".asciz \"" __FILE__"\"\n\t"                                         \
+         ".long %3\n\t"                                                       \
+         ".asciz \"" __FILE__ "\"\n\t"                                        \
          ".asciz \"" fmt "\"\n\t"                                             \
          ".popsection\n\t"                                                    \
-         :: "i"(_level), "i"(__LINE__), "i"(_typecode)                        \
+         "ldi %0, hi8(1b)\n\t"                                                \
+         : "=r" (id)                                                          \
+         : "i" (_level), "i" (__LINE__), "i" (_typecode)                      \
+         :                                                                    \
       );                                                                      \
       if constexpr (_nbytes == 0) {                                           \
-         asm volatile(                                                        \
-            "ldi r24, hi8(1b)\n\t"                                            \
-            "call ulog_detail_enqueue\n\t"                                    \
-            ::: "r24"                                                         \
-         );                                                                   \
+         ulog_detail_enqueue(id);                                             \
       } else if constexpr (_nbytes == 1) {                                    \
-         auto&& value = std::get<0>(values);                                  \
-         asm volatile(                                                        \
-            "ldi r24, hi8(1b)\n\t"                                            \
-            "push r22\n\t"                                                    \
-            "mov r22, %[value]\n\t"                                           \
-            "call ulog_detail_enqueue_1\n\t"                                  \
-            "pop r22\n\t"                                                    \
-            :: [value] "r"(value)                                             \
-            : "r24", "r22"                                                    \
-         );                                                                   \
+         auto&& b0 = std::get<0>(values);                                     \
+         ulog_detail_enqueue_1(id, b0);                                       \
       } else if constexpr (_nbytes == 2) {                                    \
          auto&& b0 = std::get<0>(values);                                     \
          auto&& b1 = std::get<1>(values);                                     \
-         asm volatile(                                                        \
-            "ldi r24, hi8(1b)\n\t"                                            \
-            "push r22\n\t"                                                    \
-            "push r23\n\t"                                                    \
-            "mov r22, %[b0]\n\t"                                              \
-            "mov r23, %[b1]\n\t"                                              \
-            "call ulog_detail_enqueue_2\n\t"                                  \
-            "pop r23\n\t"                                                     \
-            "pop r22\n\t"                                                     \
-            :: [b0] "r"(b0), [b1] "r"(b1)                                     \
-            : "r24", "r23", "r22"                                             \
-         );                                                                   \
+         ulog_detail_enqueue_2(id, b0, b1);                                   \
       } else if constexpr (_nbytes == 3) {                                    \
          auto&& b0 = std::get<0>(values);                                     \
          auto&& b1 = std::get<1>(values);                                     \
          auto&& b2 = std::get<2>(values);                                     \
-         asm volatile(                                                        \
-            "ldi r24, hi8(1b)\n\t"                                            \
-            "push r20\n\t"                                                    \
-            "push r22\n\t"                                                    \
-            "push r23\n\t"                                                    \
-            "mov r22, %[b0]\n\t"                                              \
-            "mov r23, %[b1]\n\t"                                              \
-            "mov r20, %[b2]\n\t"                                              \
-            "call ulog_detail_enqueue_3\n\t"                                  \
-            "pop r23\n\t"                                                     \
-            "pop r22\n\t"                                                     \
-            "pop r20\n\t"                                                     \
-            :: [b0] "r"(b0), [b1] "r"(b1), [b2] "r"(b2)                       \
-            : "r24", "r22", "r23", "r20"                                      \
-         );                                                                   \
+         ulog_detail_enqueue_3(id, b0, b1, b2);                               \
       } else if constexpr (_nbytes == 4) {                                    \
          auto&& b0 = std::get<0>(values);                                     \
          auto&& b1 = std::get<1>(values);                                     \
          auto&& b2 = std::get<2>(values);                                     \
-         auto&& b3 = (_nbytes > 3) ? std::get<3>(values) : 0;                 \
-         asm volatile(                                                        \
-            "ldi r24, hi8(1b)\n\t"                                            \
-            "push r20\n\t"                                                    \
-            "push r21\n\t"                                                    \
-            "push r22\n\t"                                                    \
-            "push r23\n\t"                                                    \
-            "mov r20, %[b0]\n\t"                                              \
-            "mov r21, %[b1]\n\t"                                              \
-            "mov r22, %[b2]\n\t"                                              \
-            "mov r23, %[b3]\n\t"                                              \
-            "call ulog_detail_enqueue_4\n\t"                                  \
-            "pop r23\n\t"                                                     \
-            "pop r22\n\t"                                                     \
-            "pop r21\n\t"                                                     \
-            "pop r20\n\t"                                                     \
-            :: [b0] "r"(b0), [b1] "r"(b1), [b2] "r"(b2), [b3] "r"(b3)         \
-            : "r24", "r20", "r21", "r22", "r23"                               \
-         );                                                                   \
+         auto&& b3 = std::get<3>(values);                                     \
+         ulog_detail_enqueue_4(id, b0, b1, b2, b3);                           \
       }                                                                       \
    }(__VA_ARGS__);                                                            \
 } while(0)
-
-// MACRO Compatible levels
-#define ULOG_LEVEL_ERROR    0
-#define ULOG_LEVEL_WARN     1
-#define ULOG_LEVEL_MILE     2
-#define ULOG_LEVEL_TRACE    3
-#define ULOG_LEVEL_INFO     4
-#define ULOG_LEVEL_DEBUG0   5
-#define ULOG_LEVEL_DEBUG1   6
-#define ULOG_LEVEL_DEBUG2   7
-#define ULOG_LEVEL_DEBUG3   8
-
-// Include the project trace config
-#ifdef HAS_ULOG_CONFIG_FILE
-#  include "conf_ulog.h"
-#endif
-
-#ifndef ULOG_LEVEL
-#  ifdef NDEBUG
-#     define ULOG_LEVEL ULOG_LEVEL_MILE
-#  else
-#     define ULOG_LEVEL ULOG_LEVEL_INFO
-#  endif
-#endif
-
-#if ULOG_LEVEL >= ULOG_LEVEL_ERROR
-  #define ULOG_ERROR(text, ...) ULOG(ULOG_LEVEL_ERROR, text, ##__VA_ARGS__)
-#else
-  #define ULOG_ERROR(text, ...) do {} while (0)
-#endif
-
-#if ULOG_LEVEL >= ULOG_LEVEL_WARN
-  #define ULOG_WARN(text, ...) ULOG(ULOG_LEVEL_WARN, text, ##__VA_ARGS__)
-#else
-  #define ULOG_WARN(text, ...) do {} while (0)
-#endif
-
-#if ULOG_LEVEL >= ULOG_LEVEL_MILE
-  #define ULOG_MILE(text, ...) ULOG(ULOG_LEVEL_MILE, text, ##__VA_ARGS__)
-#else
-  #define ULOG_MILE(text, ...) do {} while (0)
-#endif
-
-#if ULOG_LEVEL >= ULOG_LEVEL_TRACE
-  #define ULOG_TRACE(text, ...) ULOG(ULOG_LEVEL_TRACE, text, ##__VA_ARGS__)
-#else
-  #define ULOG_TRACE(text, ...) do {} while (0)
-#endif
-
-#if ULOG_LEVEL >= ULOG_LEVEL_INFO
-  #define ULOG_INFO(text, ...) ULOG(ULOG_LEVEL_INFO, text, ##__VA_ARGS__)
-#else
-  #define ULOG_INFO(text, ...) do {} while (0)
-#endif
-
-#if ULOG_LEVEL >= ULOG_LEVEL_DEBUG0
-  #define ULOG_DEBUG0(text, ...) ULOG(ULOG_LEVEL_DEBUG0, text, ##__VA_ARGS__)
-#else
-  #define ULOG_DEBUG0(text, ...) do {} while (0)
-#endif
-
-#if ULOG_LEVEL >= ULOG_LEVEL_DEBUG1
-  #define ULOG_DEBUG1(text, ...) ULOG(ULOG_LEVEL_DEBUG1, text, ##__VA_ARGS__)
-#else
-  #define ULOG_DEBUG1(text, ...) do {} while (0)
-#endif
-
-#if ULOG_LEVEL >= ULOG_LEVEL_DEBUG2
-  #define ULOG_DEBUG2(text, ...) ULOG(ULOG_LEVEL_DEBUG2, text, ##__VA_ARGS__)
-#else
-  #define ULOG_DEBUG2(text, ...) do {} while (0)
-#endif
-
-#if ULOG_LEVEL >= ULOG_LEVEL_DEBUG3
-  #define ULOG_DEBUG3(text, ...) ULOG(ULOG_LEVEL_DEBUG3, text, ##__VA_ARGS__)
-#else
-  #define ULOG_DEBUG3(text, ...) do {} while (0)
-#endif
