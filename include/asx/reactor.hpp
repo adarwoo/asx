@@ -128,24 +128,22 @@ namespace asx {
       ///< Shortcut for the C++ handle
       using Handler = reactor_handler_t;
 
-      ///< Null handle for C++
-      constexpr auto null = reactor_handle_t{255};
-
       ///< Wrap into a class
       class Handle {
          reactor_handle_t handle;
          using clock = timer::steady_clock;
       public:
          // Constructor to initialize handle
-         explicit Handle() : handle(null) {}
+         explicit constexpr Handle(reactor_handle_t h) noexcept: handle(h) {}
 
          // Constructor to initialize handle
-         Handle(reactor_handle_t h) : handle(h) {}
+         explicit constexpr Handle() noexcept: handle(REACTOR_NULL_HANDLE) {}
 
-         Handle(const Handle& h) = default;
-
-         // Assignment operator from another Handle
-         Handle& operator=(const Handle& other) = default;
+         // Defaulted copy/move
+         constexpr Handle(const Handle&) noexcept = default;
+         constexpr Handle(Handle&&) noexcept = default;
+         Handle& operator=(const Handle&) noexcept = default;
+         Handle& operator=(Handle&&) noexcept = default;
 
          // Assignment operator from reactor_handle_t
          Handle& operator=(reactor_handle_t h) {
@@ -328,6 +326,9 @@ namespace asx {
             );
          }
       };
+
+      // Null handle for C++ (constexpr, no constructor needed)
+      static constexpr Handle null{REACTOR_NULL_HANDLE};
 
       /**
        * @brief Reactor mask class
