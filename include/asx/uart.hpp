@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <string_view>
+#include <span>
 
 #include <asx/reactor.hpp>
 #include <asx/utils.hpp>
@@ -63,11 +64,11 @@ namespace asx {
       template<int N, UartConfig Config>
       class Uart {
          ///< Contains a view to transmit
-         inline static std::string_view to_send;
+          inline static std::span<const uint8_t> to_send;
 
-         static_assert(N < 2, "Invalid USART number");
+          static_assert(N < 2, "Invalid USART number");
 
-      public:
+        public:
          static USART_t & get() {
             if constexpr (N == 0) {
                return USART0;
@@ -136,7 +137,7 @@ namespace asx {
             Config::init();
 
             if (Config::has(map_to_alt_position)) {
-               if (N == 0) {
+               if constexpr (N == 0) {
                   PORTMUX_USARTROUTEA |= PORTMUX_USART0_ALT1_gc;
 
                   if (Config::has(onewire)) {
@@ -156,7 +157,7 @@ namespace asx {
                   }
                }
             } else {
-               if (N == 0) {
+               if constexpr (N == 0) {
                   if (Config::has(onewire)) {
                      PORTB.PIN2CTRL |= PORT_PULLUPEN_bm;
                      VPORTB_DIR |= _BV(0);
@@ -180,7 +181,7 @@ namespace asx {
             get().BAUD = get_baud_reg();
 
             // Register a reactor for filling the buffer
-            if ( N == 0 ) {
+            if constexpr ( N == 0 ) {
                dre_callback_uart0 = &on_dre;
             } else {
                dre_callback_uart1 = &on_dre;
@@ -196,43 +197,30 @@ namespace asx {
          static constexpr void disable_rx() {
             get().CTRLB &= ~USART_RXEN_bm;
          }
-         
+
          static bool tx_ready() {
             return (get().CTRLA & USART_DREIE_bm) == 0;
          }
 
-         static void send(const std::string_view view_to_send) {
-            // Store the view to transmit
-            to_send = view_to_send;
+         static void send(const std::span<const uint8_t> span_to_send) {
+            to_send = span_to_send;
 
             // Enable the DRE and TXCIE interrupts
             get().CTRLA |= USART_DREIE_bm | USART_TXCIE_bm;
-            #ifdef SIM
-               char buffer[512]; // Ensure the buffer is large enough
-               size_t buffer_pos = 0;
+         }
 
-               // Convert the string_view to hex and write to the buffer
-               for (unsigned char c : view_to_send) {
-                  buffer_pos += std::snprintf(buffer + buffer_pos, sizeof(buffer) - buffer_pos, "%02X ", c);
-               }
-
-               // Remove the trailing space, if necessary
-               if (buffer_pos > 0) {
-                  buffer[buffer_pos - 1] = '\0';
-               } else {
-                  buffer[0] = '\0';
-               }
-
-               trace("%s", buffer);
-            #endif
+         static void send(const std::string_view view_to_send) {
+            send(std::span<const uint8_t>(
+               reinterpret_cast<const uint8_t*>(view_to_send.data()),
+               view_to_send.size()
+            ));
          }
 
          // Called from the DRE interrupt to indicate there is space in the Tx buffer
-         static void on_dre()
-         {
+         static void on_dre(){
             if ( not to_send.empty() ) {
                get().TXDATAL = to_send.front();
-               to_send.remove_prefix(1);
+               to_send = to_send.subspan(1);
             } else {
                // Disable the DRE interrupt
                get().CTRLA &= ~USART_DREIE_bm;
@@ -241,7 +229,7 @@ namespace asx {
 
 		   static void react_on_send_complete( reactor_handle_t reactor ) {
             // Register a reactor for filling the buffer
-            if ( N == 0 ) {
+            if constexpr ( N == 0 ) {
                on_usart0_tx_complete = reactor;
             } else {
                on_usart1_tx_complete = reactor;
@@ -250,7 +238,7 @@ namespace asx {
 
 		   static void react_on_character_received( reactor_handle_t reactor ) {
             // Register a reactor for filling the buffer
-            if ( N == 0 ) {
+            if constexpr ( N == 0 ) {
                on_usart0_rx_complete = reactor;
             } else {
                on_usart1_rx_complete = reactor;
