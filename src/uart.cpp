@@ -6,16 +6,16 @@ namespace asx {
    namespace uart {
       using dre_callback = void(*)();
 
-      auto on_usart0_rx_complete = reactor::Handle{};
-      auto on_usart0_tx_complete = reactor::Handle{};
+      auto on_usart0_rx_complete = reactor::Handle();
+      auto on_usart0_tx_complete = reactor::Handle();
 
-      auto on_usart1_rx_complete = reactor::Handle{};
-      auto on_usart1_tx_complete = reactor::Handle{};
+      auto on_usart1_rx_complete = reactor::Handle();
+      auto on_usart1_tx_complete = reactor::Handle();
 
       // These callbacks are managed by the Uart directly
       dre_callback dre_callback_uart0 = nullptr;
       dre_callback dre_callback_uart1 = nullptr;
-      
+
       extern "C" {
          ISR(USART0_RXC_vect)
          {
@@ -52,6 +52,6 @@ namespace asx {
          {
             dre_callback_uart1();
          }
-      } // extern "C"         
+      } // extern "C"
    }
 }
