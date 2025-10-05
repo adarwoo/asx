@@ -118,7 +118,7 @@ BUILDDIRS        = $(sort $(dir $(OBJS)))
 # Does the project have a trace config?
 CPPFLAGS += $(if $(wildcard $(TOP)/conf/conf_ulog.h), -DHAS_ULOG_CONFIG_FILE,)
 
-all : $(BUILDDIRS) $(BUILD_DIR)/$(BIN)$(BIN_EXT)
+all : $(BUILDDIRS) $(BIN)$(BIN_EXT)
 
 -include $(RCDEP_FILES)
 
