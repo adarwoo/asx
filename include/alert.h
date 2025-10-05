@@ -26,6 +26,7 @@
 #include <ulog.h>
 
 #ifdef __cplusplus
+#include <asx/ulog.hpp>
 extern "C"
 {
 #endif
@@ -49,10 +50,10 @@ void alert_user_function(void);
 void alert_record(bool abort);
 
 /** Raise and alert. This macro adds the line and file automatically */
-#define alert() do { ULOG0_ERROR("ALERT!"); alert_record(false) } while(0)
+#define alert() do { ULOG_ERROR("ALERT!"); alert_record(false) } while(0)
 
 /** Raise an alert and stop. This macro adds the line and file automatically */
-#define alert_and_stop() do { ULOG0_ERROR("ALERT!"); alert_record(true); } while(0)
+#define alert_and_stop() do { ULOG_ERROR("ALERT!"); alert_record(true); } while(0)
 
 /**
  * Conditionally raise and alert and stop.
@@ -62,7 +63,7 @@ void alert_record(bool abort);
  */
 #define alert_and_stop_if(cond)               \
    if (cond) {                                \
-      ULOG0_ERROR("ALERT_AND_STOP_IF");       \
+      ULOG_ERROR("ALERT_AND_STOP_IF");        \
       alert_record(true);                     \
    }
 
