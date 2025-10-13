@@ -14,9 +14,6 @@
 
 namespace asx {
    namespace timer {
-      ///< Null handle for C++
-      constexpr auto null = timer_instance_t{TIMER_INVALID_INSTANCE};
-
       // Define a steady clock based on your embedded 1ms timer
       struct steady_clock {
          using duration = std::chrono::duration<uint32_t, std::milli>;
@@ -73,7 +70,7 @@ namespace asx {
          timer_instance_t instance;
       public:
          // Constructor to initialize handle
-         explicit Instance() : instance(null) {}
+         explicit constexpr Instance() : instance(TIMER_INVALID_INSTANCE) {}
 
          // Constructor to initialize handle
          Instance(timer_instance_t inst) : instance(inst) {}
@@ -100,6 +97,8 @@ namespace asx {
             return false;
          }
       };
+
+      constexpr auto null = Instance();
 
       using duration = steady_clock::duration;
       using time_point = steady_clock::time_point;
