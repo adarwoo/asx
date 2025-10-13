@@ -99,7 +99,7 @@ DEP_FILES        = $(OBJS:%.o=%.d)
 
 RCDEP_FILES      = $(foreach rc, $(SRCS.resources:%.json=%.rcd), $(BUILD_DIR)/$(rc))
 
-COMPILE.c        = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(ARCHFLAGS) -c
+COMPILE.c        = $(CC) $(DEPFLAGS) $(CONLYFLAGS) $(CFLAGS) $(CPPFLAGS) $(ARCHFLAGS) -c
 COMPILE.cxx      = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(ARCHFLAGS) -c
 COMPILE.rc       = $(RC) -E
 COMPILE.as       = $(CC) $(ASFLAGS) $(CPPFLAGS) $(ARCHFLAGS) -c

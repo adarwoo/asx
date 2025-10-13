@@ -23,7 +23,8 @@ BIN_EXT :=.elf
 
 # Remove all logs
 ARCHFLAGS :=-mmcu=$(ARCH) -B $(SPEC_PATH) -isystem $(PACK_PATH)/include
-CFLAGS += -funsigned-char -funsigned-bitfields -ffunction-sections -fdata-sections -fshort-enums $(ARCHFLAGS)
+CONLYFLAGS := -std=gnu17
+CFLAGS += --save-temps -funsigned-char -funsigned-bitfields -ffunction-sections -fdata-sections -fshort-enums $(ARCHFLAGS)
 CFLAGS += -O$(if $(NDEBUG),s,g)
 ASFLAGS += $(CPPFLAGS) $(ARCHFLAGS)
 CXXFLAGS += -fno-threadsafe-statics -Wno-subobject-linkage
