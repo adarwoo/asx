@@ -75,431 +75,253 @@ void ulog_detail_enqueue_4(uint8_t id, uint8_t v0, uint8_t v1, uint8_t v2, uint8
 // ============================================================================
 // C type codes
 // ============================================================================
-#define ULOG_TYPE_TRAIT_NONE  0
-#define ULOG_TYPE_TRAIT_U8    0x10
-#define ULOG_TYPE_TRAIT_S8    0x11
-#define ULOG_TYPE_TRAIT_BOOL  0x12
-#define ULOG_TYPE_TRAIT_U16   0x20
-#define ULOG_TYPE_TRAIT_S16   0x21
-#define ULOG_TYPE_TRAIT_PTR   0x22
-#define ULOG_TYPE_TRAIT_U32   0x40
-#define ULOG_TYPE_TRAIT_S32   0x41
-#define ULOG_TYPE_TRAIT_FLOAT 0x42
-#define ULOG_TYPE_TRAIT_STR4  0x43
+#define ULOG_TRAIT_ID_NONE  0
+#define ULOG_TRAIT_ID_U8    0x10
+#define ULOG_TRAIT_ID_S8    0x11
+#define ULOG_TRAIT_ID_BOOL  0x12
+#define ULOG_TRAIT_ID_U16   0x20
+#define ULOG_TRAIT_ID_S16   0x21
+#define ULOG_TRAIT_ID_PTR   0x22
+#define ULOG_TRAIT_ID_U32   0x40
+#define ULOG_TRAIT_ID_S32   0x41
+#define ULOG_TRAIT_ID_FLOAT 0x42
+#define ULOG_TRAIT_ID_STR4  0x43
+
+// ============================================================================
+// Helper to generate .logs section and get ID
+// ============================================================================
+
+/**
+   * @brief Generate a unique log ID based on level, format string, line number, and typecode.
+   *
+   * This function combines the log level, a pointer to the format string,
+   * the line number, and a typecode representing the argument types into
+   * a unique 8-bit identifier. The identifier is used to reference the
+   * log message in the .logs section of the ELF binary.
+   * The function also emits the log metadata into a dedicated .logs section
+   *
+   * @param level The log level (e.g., debug, info, warn, error).
+   * @param fmt A pointer to the format string (must be a string literal).
+   * @param line The line number where the log call is made.
+   * @param typecode A 32-bit code representing the types of the arguments.
+   * @return A unique 8-bit log ID.
+   */
+#define _ULOG_GENERATE_LOG_ID(level, fmt, typecode) \
+   register uint8_t id asm("r24"); \
+   asm volatile( \
+      ".pushsection .logs,\"\",@progbits\n\t" \
+      ".balign 256\n\t" \
+      "1:\n\t" \
+      ".byte %1\n\t" \
+      ".long %2\n\t" \
+      ".long %3\n\t" \
+      ".asciz \"" __FILE__ "\"\n\t" \
+      ".asciz \"" fmt "\"\n\t" \
+      ".popsection\n\t" \
+      "ldi %0, hi8(1b)\n\t" \
+      : "=r" (id) \
+      : "i" (level), "i" (__LINE__), "i" (typecode) \
+      : \
+   );
 
 // This section creates the macros for C usage
 // C++ users should use the templated version in ulog.hpp which is more type-safe
 #ifndef __cplusplus
 
-// Macro to map types -> ArgTrait
-#define _ULOG_ARG_TRAIT(x) _Generic((x),     \
-    bool:      ULOG_TYPE_TRAIT_BOOL,   \
-    char*:     ULOG_TYPE_TRAIT_STR4,   \
-    const char*: ULOG_TYPE_TRAIT_STR4, \
-    float:     ULOG_TYPE_TRAIT_FLOAT,  \
-    double:    ULOG_TYPE_TRAIT_FLOAT,  \
-    int8_t:    ULOG_TYPE_TRAIT_S8,     \
-    int16_t:   ULOG_TYPE_TRAIT_S16,    \
-    int32_t:   ULOG_TYPE_TRAIT_S32,    \
-    int64_t:   ULOG_TYPE_TRAIT_S64,    \
-    uint8_t:   ULOG_TYPE_TRAIT_U8,     \
-    uint16_t:  ULOG_TYPE_TRAIT_U16,    \
-    uint32_t:  ULOG_TYPE_TRAIT_U32,    \
-    uint64_t:  ULOG_TYPE_TRAIT_U64,    \
-    default:   ULOG_TYPE_TRAIT_NONE    \
-)
-
-#define _ULOG_TRAIT_SIZE(trait) \
-    ((trait)==ULOG_TYPE_TRAIT_U8    ? 1 : \
-     (trait)==ULOG_TYPE_TRAIT_S8    ? 1 : \
-     (trait)==ULOG_TYPE_TRAIT_BOOL  ? 1 : \
-     (trait)==ULOG_TYPE_TRAIT_U16   ? 2 : \
-     (trait)==ULOG_TYPE_TRAIT_S16   ? 2 : \
-     (trait)==ULOG_TYPE_TRAIT_PTR   ? 2 : \
-     (trait)==ULOG_TYPE_TRAIT_U32   ? 4 : \
-     (trait)==ULOG_TYPE_TRAIT_S32   ? 4 : \
-     (trait)==ULOG_TYPE_TRAIT_FLOAT ? 4 : \
-     (trait)==ULOG_TYPE_TRAIT_STR4  ? 4 : \
-     0)
-
 // ============================================================================
-// Trait folding into uint32_t signature
-// ============================================================================
-#define _ULOG_TRAITS_1(a) ((uint32_t)_ULOG_ARG_TRAIT(a))
-#define _ULOG_TRAITS_2(a,b) (_ULOG_TRAITS_1(a) | ((uint32_t)_ULOG_ARG_TRAIT(b) << 8))
-#define _ULOG_TRAITS_3(a,b,c) (_ULOG_TRAITS_2(a,b) | ((uint32_t)_ULOG_ARG_TRAIT(c) << 16))
-#define _ULOG_TRAITS_4(a,b,c,d) (_ULOG_TRAITS_3(a,b,c) | ((uint32_t)_ULOG_ARG_TRAIT(d) << 24))
-
-// ============================================================================
-// Total payload size per arity
-// ============================================================================
-#define _ULOG_TRAITS_SIZE_1(a) (_ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(a)))
-#define _ULOG_TRAITS_SIZE_2(a,b) (_ULOG_TRAITS_SIZE_1(a) + _ULOG_TRAITS_SIZE_1(b))
-#define _ULOG_TRAITS_SIZE_3(a,b,c) (_ULOG_TRAITS_SIZE_2(a,b) + _ULOG_TRAITS_SIZE_1(c))
-#define _ULOG_TRAITS_SIZE_4(a,b,c,d) (_ULOG_TRAITS_SIZE_3(a,b,c) + _ULOG_TRAITS_SIZE_1(d))
-
-// ============================================================================
-// Argmument counting helper macros
-// ============================================================================
-#define _ULOG_OVERLOAD(_0, _1, _2, _3, NAME, ...) NAME
-#define _ULOG_CHOOSER(...) _ULOG_OVERLOAD(__VA_ARGS__, _ULOG3, _ULOG2, _ULOG1, _ULOG0)
-
-// ============================================================================
-// Final ULOG_ENQ_* macros for all combinations
+// Static inline runtime dispatch functions (FIXED)
 // ============================================================================
 
-// 0 bytes total
-#define ULOG_ENQ_0(level, typecode, fmt) \
-    do { \
-        register uint8_t id asm("r24"); \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue(id); \
-    } while(0)
+// Updated: Remove fmt parameter, generate ID in the calling macro
+static inline void _ulog_dispatch_0(uint8_t id) {
+    ulog_detail_enqueue(id);
+}
 
-// 1 byte total - single uint8_t
-#define ULOG_ENQ_1(level, typecode, fmt, b0) \
-    do { \
-        register uint8_t id asm("r24"); \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue_1(id, b0); \
-    } while(0)
+static inline void _ulog_dispatch_1_u8(uint8_t id, uint8_t a) {
+    ulog_detail_enqueue_1(id, a);
+}
 
-// 2 bytes total - two uint8_t
-#define ULOG_ENQ_1_1(level, typecode, fmt, b0, b1) \
-    do { \
-        register uint8_t id asm("r24"); \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue_2(id, b0, b1); \
-    } while(0)
+static inline void _ulog_dispatch_1_u16(uint8_t id, uint16_t a) {
+    ulog_detail_enqueue_2(id, (uint8_t)(a), (uint8_t)(a >> 8));
+}
 
-// 2 bytes total - single uint16_t (split into bytes)
-#define ULOG_ENQ_2(level, typecode, fmt, w0) \
-    do { \
-        register uint8_t id asm("r24"); \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue_2(id, (uint8_t)(w0), (uint8_t)(w0 >> 8)); \
-    } while(0)
+static inline void _ulog_dispatch_1_u32(uint8_t id, uint32_t a) {
+    ulog_detail_enqueue_4(id,
+        (uint8_t)(a),
+        (uint8_t)(a >> 8),
+        (uint8_t)(a >> 16),
+        (uint8_t)(a >> 24));
+}
 
-// 3 bytes total - uint8_t + uint16_t
-#define ULOG_ENQ_1_2(level, typecode, fmt, b0, w0) \
-    do { \
-        register uint8_t id asm("r24"); \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue_3(id, b0, (uint8_t)(w0), (uint8_t)(w0 >> 8)); \
-    } while(0)
+static inline void _ulog_dispatch_1_float(uint8_t id, float a) {
+    union { float f; uint32_t u; } conv = { .f = a };
+    ulog_detail_enqueue_4(id,
+        (uint8_t)(conv.u),
+        (uint8_t)(conv.u >> 8),
+        (uint8_t)(conv.u >> 16),
+        (uint8_t)(conv.u >> 24));
+}
 
-// 3 bytes total - uint16_t + uint8_t
-#define ULOG_ENQ_2_1(level, typecode, fmt, w0, b0) \
-    do { \
-        register uint8_t id asm("r24"); \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue_3(id, (uint8_t)(w0), (uint8_t)(w0 >> 8), b0); \
-    } while(0)
+static inline void _ulog_dispatch_2_u8_u8(uint8_t id, uint8_t a, uint8_t b) {
+    ulog_detail_enqueue_2(id, a, b);
+}
 
-// 3 bytes total - three uint8_t
-#define ULOG_ENQ_1_1_1(level, typecode, fmt, b0, b1, b2) \
-    do { \
-        register uint8_t id asm("r24"); \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue_3(id, b0, b1, b2); \
-    } while(0)
+static inline void _ulog_dispatch_2_u8_u16(uint8_t id, uint8_t a, uint16_t b) {
+    ulog_detail_enqueue_3(id, a, (uint8_t)(b), (uint8_t)(b >> 8));
+}
 
-// 4 bytes total - uint8_t, uint8_t, uint16_t
-#define ULOG_ENQ_1_1_2(level, typecode, fmt, b0, b1, w0) \
+static inline void _ulog_dispatch_2_u16_u8(uint8_t id, uint16_t a, uint8_t b) {
+    ulog_detail_enqueue_3(id, (uint8_t)(a), (uint8_t)(a >> 8), b);
+}
+
+static inline void _ulog_dispatch_2_u16_u16(uint8_t id, uint16_t a, uint16_t b) {
+    ulog_detail_enqueue_4(id,
+        (uint8_t)(a), (uint8_t)(a >> 8),
+        (uint8_t)(b), (uint8_t)(b >> 8));
+}
+
+static inline void _ulog_dispatch_3_u8_u8_u8(uint8_t id, uint8_t a, uint8_t b, uint8_t c) {
+    ulog_detail_enqueue_3(id, a, b, c);
+}
+
+static inline void _ulog_dispatch_3_u8_u16(uint8_t id, uint8_t a, uint16_t b) {
+    ulog_detail_enqueue_3(id, a, (uint8_t)(b), (uint8_t)(b >> 8));
+}
+
+static inline void _ulog_dispatch_3_u16_u8(uint8_t id, uint16_t a, uint8_t b) {
+    ulog_detail_enqueue_3(id, (uint8_t)(a), (uint8_t)(a >> 8), b);
+}
+
+static inline void _ulog_dispatch_4_u8_u8_u8_u8(uint8_t id, uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+    ulog_detail_enqueue_4(id, a, b, c, d);
+}
+
+// ============================================================================
+// Updated dispatch macros - generate ID first, then call function
+// ============================================================================
+
+// ============================================================================
+// Type code extraction helper
+// ============================================================================
+#define _ULOG_TC(x) _Generic((x), \
+   uint8_t:  ULOG_TRAIT_ID_U8, \
+   int8_t:   ULOG_TRAIT_ID_S8, \
+   _Bool:    ULOG_TRAIT_ID_BOOL, \
+   uint16_t: ULOG_TRAIT_ID_U16, \
+   int16_t:  ULOG_TRAIT_ID_S16, \
+   uint32_t: ULOG_TRAIT_ID_U32, \
+   int32_t:  ULOG_TRAIT_ID_S32, \
+   float:    ULOG_TRAIT_ID_FLOAT, \
+   double:   ULOG_TRAIT_ID_FLOAT, \
+   default:  ULOG_TRAIT_ID_NONE)
+
+// Helper macros that generate ID first, then call the dispatch function
+#define _ULOG_SELECT_0(level, fmt) \
    do { \
-      register uint8_t id asm("r24"); \
-      asm volatile( \
-         ".pushsection .logs,\"\",@progbits\n\t" \
-         ".balign 256\n\t" \
-         "1:\n\t" \
-         ".byte %1\n\t" \
-         ".long %2\n\t" \
-         ".long %3\n\t" \
-         ".asciz \"" __FILE__ "\"\n\t" \
-         ".asciz \"" fmt "\"\n\t" \
-         ".popsection\n\t" \
-         "ldi %0, hi8(1b)\n\t" \
-         : "=r" (id) \
-         : "i" (level), "i" (__LINE__), "i" (typecode) \
-         : \
-      ); \
-      ulog_detail_enqueue_4(id, b0, b1, (uint8_t)(w0), (uint8_t)(w0 >> 8)); \
+      _ULOG_GENERATE_LOG_ID(level, fmt, 0) \
+      _ulog_dispatch_0(id); \
    } while(0)
 
-// 4 bytes total - uint8_t, uint16_t, uint8_t
-#define ULOG_ENQ_1_2_1(level, typecode, fmt, b0, w0, b1) \
+// ============================================================================
+// Simplified dispatch macros with computed typecode
+// ============================================================================
+
+#define _ULOG_DISPATCH_0(level, fmt) \
    do { \
-      register uint8_t id asm("r24"); \
-      asm volatile( \
-         ".pushsection .logs,\"\",@progbits\n\t" \
-         ".balign 256\n\t" \
-         "1:\n\t" \
-         ".byte %1\n\t" \
-         ".long %2\n\t" \
-         ".long %3\n\t" \
-         ".asciz \"" __FILE__ "\"\n\t" \
-         ".asciz \"" fmt "\"\n\t" \
-         ".popsection\n\t" \
-         "ldi %0, hi8(1b)\n\t" \
-         : "=r" (id) \
-         : "i" (level), "i" (__LINE__), "i" (typecode) \
-         : \
-      ); \
-      ulog_detail_enqueue_4(id, b0, (uint8_t)(w0), (uint8_t)(w0 >> 8), b1); \
+      _ULOG_GENERATE_LOG_ID(level, fmt, 0) \
+      _ulog_dispatch_0(id); \
    } while(0)
 
-// 4 bytes total - uint16_t, uint8_t, uint8_t
-#define ULOG_ENQ_2_1_1(level, typecode, fmt, w0, b0, b1) \
-      do { \
-         register uint8_t id asm("r24"); \
-         asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-         ); \
-         ulog_detail_enqueue_4(id, (uint8_t)(w0), (uint8_t)(w0 >> 8), b0, b1); \
-      } while(0)
+#define _ULOG_DISPATCH_1(level, fmt, a) \
+   do { \
+      uint32_t typecode = _ULOG_TC(a); \
+      _ULOG_GENERATE_LOG_ID(level, fmt, typecode) \
+      _Generic((a), \
+         uint8_t:  _ulog_dispatch_1_u8(id, a), \
+         int8_t:   _ulog_dispatch_1_u8(id, a), \
+         _Bool:    _ulog_dispatch_1_u8(id, a), \
+         uint16_t: _ulog_dispatch_1_u16(id, a), \
+         int16_t:  _ulog_dispatch_1_u16(id, a), \
+         uint32_t: _ulog_dispatch_1_u32(id, a), \
+         int32_t:  _ulog_dispatch_1_u32(id, a), \
+         float:    _ulog_dispatch_1_float(id, a), \
+         double:   _ulog_dispatch_1_float(id, a)); \
+   } while(0)
 
-// 4 bytes total - single uint32_t/float
-#define ULOG_ENQ_4(level, typecode, fmt, d0) \
-    do { \
-        register uint8_t id asm("r24"); \
-        union { uint32_t u; float f; } conv = {0}; \
-        if ((typecode & 0xFF) == ULOG_TYPE_TRAIT_FLOAT) conv.f = d0; \
-        else conv.u = d0; \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue_4(id, (uint8_t)(conv.u), (uint8_t)(conv.u >> 8), \
-                             (uint8_t)(conv.u >> 16), (uint8_t)(conv.u >> 24)); \
-    } while(0)
+#define _ULOG_DISPATCH_2(level, fmt, a, b) \
+   do { \
+      uint32_t typecode = (_ULOG_TC(b) << 8) | _ULOG_TC(a); \
+      _ULOG_GENERATE_LOG_ID(level, fmt, typecode) \
+      _Generic((a), \
+         uint8_t: _Generic((b), \
+            uint8_t:  _ulog_dispatch_2_u8_u8( id, a, b), \
+            int8_t:   _ulog_dispatch_2_u8_u8( id, a, b), \
+            _Bool:    _ulog_dispatch_2_u8_u8( id, a, b), \
+            uint16_t: _ulog_dispatch_2_u8_u16(id, a, b), \
+            int16_t:  _ulog_dispatch_2_u8_u16(id, a, b), \
+            default:  _ulog_dispatch_2_u8_u8( id, a, b)), \
+         int8_t: _Generic((b), \
+            uint8_t:  _ulog_dispatch_2_u8_u8( id, a, b), \
+            int8_t:   _ulog_dispatch_2_u8_u8( id, a, b), \
+            _Bool:    _ulog_dispatch_2_u8_u8( id, a, b), \
+            uint16_t: _ulog_dispatch_2_u8_u16(id, a, b), \
+            int16_t:  _ulog_dispatch_2_u8_u16(id, a, b), \
+            default:  _ulog_dispatch_2_u8_u8( id, a, b)), \
+         _Bool: _Generic((b), \
+            uint8_t:  _ulog_dispatch_2_u8_u8( id, a, b), \
+            int8_t:   _ulog_dispatch_2_u8_u8( id, a, b), \
+            _Bool:    _ulog_dispatch_2_u8_u8( id, a, b), \
+            uint16_t: _ulog_dispatch_2_u8_u16(id, a, b), \
+            int16_t:  _ulog_dispatch_2_u8_u16(id, a, b), \
+            default:  _ulog_dispatch_2_u8_u8( id, a, b)), \
+         uint16_t: _Generic((b), \
+            uint8_t:  _ulog_dispatch_2_u16_u8( id, a, b), \
+            int8_t:   _ulog_dispatch_2_u16_u8( id, a, b), \
+            _Bool:    _ulog_dispatch_2_u16_u8( id, a, b), \
+            uint16_t: _ulog_dispatch_2_u16_u16(id, a, b), \
+            int16_t:  _ulog_dispatch_2_u16_u16(id, a, b), \
+            default:  _ulog_dispatch_2_u16_u8( id, a, b)), \
+         int16_t: _Generic((b), \
+            uint8_t:  _ulog_dispatch_2_u16_u8( id, a, b), \
+            int8_t:   _ulog_dispatch_2_u16_u8( id, a, b), \
+            _Bool:    _ulog_dispatch_2_u16_u8( id, a, b), \
+            uint16_t: _ulog_dispatch_2_u16_u16(id, a, b), \
+            int16_t:  _ulog_dispatch_2_u16_u16(id, a, b), \
+            default:  _ulog_dispatch_2_u16_u8( id, a, b)), \
+         default: _ulog_dispatch_2_u8_u8(id, a, b)); \
+   } while(0)
 
-// 4 bytes total - two uint16_t
-#define ULOG_ENQ_2_2(level, typecode, fmt, w0, w1) \
-    do { \
-        register uint8_t id asm("r24"); \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue_4(id, (uint8_t)(w0), (uint8_t)(w0 >> 8), \
-                             (uint8_t)(w1), (uint8_t)(w1 >> 8)); \
-    } while(0)
+#define _ULOG_DISPATCH_3(level, fmt, a, b, c) \
+   do { \
+      uint32_t typecode = (_ULOG_TC(c) << 16) | (_ULOG_TC(b) << 8) | _ULOG_TC(a); \
+      _ULOG_GENERATE_LOG_ID(level, fmt, typecode) \
+      _Generic((a), \
+         uint8_t: _Generic((b), \
+            uint8_t: _ulog_dispatch_3_u8_u8_u8(id, a, b, c), \
+            uint16_t: _ulog_dispatch_3_u8_u16(id, a, b), \
+            default: _ulog_dispatch_3_u8_u8_u8(id, a, b, c)), \
+         uint16_t: _ulog_dispatch_3_u16_u8(id, a, b), \
+         default: _ulog_dispatch_3_u8_u8_u8(id, a, b, c)); \
+   } while(0)
 
-// 4 bytes total - four uint8_t
-#define ULOG_ENQ_1_1_1_1(level, typecode, fmt, b0, b1, b2, b3) \
-    do { \
-        register uint8_t id asm("r24"); \
-        asm volatile( \
-            ".pushsection .logs,\"\",@progbits\n\t" \
-            ".balign 256\n\t" \
-            "1:\n\t" \
-            ".byte %1\n\t" \
-            ".long %2\n\t" \
-            ".long %3\n\t" \
-            ".asciz \"" __FILE__ "\"\n\t" \
-            ".asciz \"" fmt "\"\n\t" \
-            ".popsection\n\t" \
-            "ldi %0, hi8(1b)\n\t" \
-            : "=r" (id) \
-            : "i" (level), "i" (__LINE__), "i" (typecode) \
-            : \
-        ); \
-        ulog_detail_enqueue_4(id, b0, b1, b2, b3); \
-    } while(0)
+#define _ULOG_DISPATCH_4(level, fmt, a, b, c, d) \
+   do { \
+      uint32_t typecode = (_ULOG_TC(d) << 24) | (_ULOG_TC(c) << 16) | (_ULOG_TC(b) << 8) | _ULOG_TC(a); \
+      _ULOG_GENERATE_LOG_ID(level, fmt, typecode) \
+      _ulog_dispatch_4_u8_u8_u8_u8(id, a, b, c, d); \
+   } while(0)
 
-// ============================================================================
-// Compile-time size-based macro dispatch
-// ============================================================================
+// Argument counting (unchanged)
+#define _ULOG_GET_ARG_COUNT(...) _ULOG_GET_ARG_COUNT_IMPL(0, ##__VA_ARGS__, 4, 3, 2, 1, 0)
+#define _ULOG_GET_ARG_COUNT_IMPL(dummy, _1, _2, _3, _4, N, ...) N
 
-// Concatenation helpers
-#define _ULOG_CONCAT(a, b) a##b
-#define _ULOG_CONCAT2(a, b) _ULOG_CONCAT(a, b)
-#define _ULOG_CONCAT3(a, b, c) _ULOG_CONCAT2(_ULOG_CONCAT(a, b), c)
-#define _ULOG_CONCAT4(a, b, c, d) _ULOG_CONCAT2(_ULOG_CONCAT3(a, b, c), d)
-#define _ULOG_CONCAT5(a, b, c, d, e) _ULOG_CONCAT2(_ULOG_CONCAT4(a, b, c, d), e)
+// Fixed dispatcher with proper indirection (unchanged)
+#define _ULOG_DISPATCH(n) _ULOG_DISPATCH_IMPL(n)
+#define _ULOG_DISPATCH_IMPL(n) _ULOG_DISPATCH_##n
 
-// Generate ULOG_ENQ_X_X_X macro name from argument sizes
-#define _ULOG_ENQ_NAME_1(s1) \
-    _ULOG_CONCAT2(ULOG_ENQ_, s1)
-
-#define _ULOG_ENQ_NAME_2(s1, s2) \
-    _ULOG_CONCAT4(ULOG_ENQ_, s1, _, s2)
-
-#define _ULOG_ENQ_NAME_3(s1, s2, s3) \
-    _ULOG_CONCAT5(ULOG_ENQ_, s1, _, s2, _, s3)
-
-#define _ULOG_ENQ_NAME_4(s1, s2, s3, s4) \
-    _ULOG_CONCAT2(_ULOG_CONCAT5(ULOG_ENQ_, s1, _, s2, _), _ULOG_CONCAT3(s3, _, s4))
-
-// ============================================================================
-// Universal ULOG macro - compile-time dispatch only
-// ============================================================================
-
+// Main ULOG macro (unchanged)
 #define ULOG(level, fmt, ...) \
-    _ULOG_CHOOSER(__VA_ARGS__)(level, fmt, ##__VA_ARGS__)
-
-// 0 arguments
-#define _ULOG0(level, fmt) \
-    ULOG_ENQ_0(level, 0, fmt)
-
-// 1 argument
-#define _ULOG1(level, fmt, a) \
-    _ULOG_ENQ_NAME_1(_ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(a)))( \
-        level, _ULOG_TRAITS_1(a), fmt, a)
-
-// 2 arguments
-#define _ULOG2(level, fmt, a, b) \
-    _ULOG_ENQ_NAME_2(_ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(a)), \
-                     _ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(b)))( \
-        level, _ULOG_TRAITS_2(a, b), fmt, a, b)
-
-// 3 arguments
-#define _ULOG3(level, fmt, a, b, c) \
-    _ULOG_ENQ_NAME_3(_ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(a)), \
-                     _ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(b)), \
-                     _ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(c)))( \
-        level, _ULOG_TRAITS_3(a, b, c), fmt, a, b, c)
-
-// 4 arguments
-#define _ULOG4(level, fmt, a, b, c, d) \
-    _ULOG_ENQ_NAME_4(_ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(a)), \
-                     _ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(b)), \
-                     _ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(c)), \
-                     _ULOG_TRAIT_SIZE(_ULOG_ARG_TRAIT(d)))( \
-        level, _ULOG_TRAITS_4(a, b, c, d), fmt, \
-        a, b, c, d)
+    _ULOG_DISPATCH(_ULOG_GET_ARG_COUNT(__VA_ARGS__))(level, fmt, ##__VA_ARGS__)
 
 #endif // __cplusplus
 
