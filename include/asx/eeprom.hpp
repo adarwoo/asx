@@ -237,6 +237,7 @@ namespace asx
 #define pEEData ((uint8_t *)(&USERROW))
 #define fletcher16_ptr ((uint16_t *)(&USERROW.USERROW30))
          static constexpr auto size = sizeof(T);
+         static inline bool formatted = false;
 
          static_assert(sizeof(T) < USER_SIGNATURES_SIZE - 2, "User row too small for the requested data");
 
@@ -260,24 +261,15 @@ namespace asx
           * the eeprom content is valid.
           * Access to the NVStorage is assumed free at this stage
           */
-         explicit Storage(const T &initial_data) : T{initial_data}
-         {
+         explicit Storage(const T &initial_data) : T{initial_data} {
             // Check the eeprom content
             uint16_t fl16 = calc_fletcher16(pEEData);
 
             // Update the content
-            if (*fletcher16_ptr != fl16)
-            {
-               const T *pDefault = static_cast<T *>(this);
-
-               memcpy(pEEData, (void *)pDefault, size);
-               *fletcher16_ptr = calc_fletcher16((uint8_t *)pDefault);
-               NVMCTRL.ADDR = (uint16_t)(&USERROW);
-               wait_til_ready();
-               ccp_write_spm((uint8_t *)&NVMCTRL.CTRLA, NVMCTRL_CMD_PAGEERASEWRITE_gc);
-            }
-            else
-            {
+            if (*fletcher16_ptr != fl16) {
+               do_operation();
+               formatted = true;
+            } else {
                memcpy((void *)static_cast<T *>(this), (void *)pEEData, size);
             }
          }
@@ -302,21 +294,25 @@ namespace asx
             return *this;
          }
 
-         void update()
-         {
+         void update() {
             request_operation();
+         }
+
+         bool is_formatted() const {
+            return formatted;
          }
 
       protected:
          // Called to make eeprom operation - guaranting the eeprom is ready
-         virtual void do_operation() override
-         {
+         virtual void do_operation() override {
             const T *pDefault = static_cast<T *>(this);
 
             memcpy(pEEData, (void *)pDefault, size);
             *fletcher16_ptr = calc_fletcher16((uint8_t *)pDefault);
             NVMCTRL.ADDR = (uint16_t)(&USERROW);
+            wait_til_ready();
             ccp_write_spm((uint8_t *)&NVMCTRL.CTRLA, NVMCTRL_CMD_PAGEERASEWRITE_gc);
+            formatted = false;
          }
       };
 
