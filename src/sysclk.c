@@ -39,6 +39,8 @@
 #include <sysclk.h>
 #include <osc.h>
 
+#include <ulog.h>
+
 /**
  * Fill the heap with a 0xaa
  * This is called prior to C++ static constructors
@@ -56,7 +58,7 @@ static void
 	 */
 	if (CONFIG_SYSCLK_SOURCE != SYSCLK_SRC_RC20MHZ) {
 		ccp_write_io((uint8_t *)&CLKCTRL.MCLKLOCK, CONFIG_SYSCLK_SOURCE);
-
+      ULOG_WARN("Switching to clock source {}", CONFIG_SYSCLK_SOURCE);
       // Wait for the clock to stabilize
       switch (CONFIG_SYSCLK_SOURCE) {
       case SYSCLK_SRC_RC20MHZ:
@@ -71,6 +73,13 @@ static void
       case SYSCLK_SRC_XOSC:
          osc_wait_ready(OSC_ID_XOSC);
          break;
+      }
+   } else {
+      ULOG_MILE("Using default RC20MHz clock");
+
+      /* Check the fuse setting FREQSEL and warn if not running at 20MHz! */
+      if ( (FUSE.OSCCFG & FUSE_FREQSEL_gm ) != FREQSEL_20MHZ_gc ) {
+         ULOG_WARN("Fuses not set for 20MHz operation - check FREQSEL fuse");
       }
    }
 }
