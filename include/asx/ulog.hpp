@@ -66,17 +66,17 @@ namespace asx {
       namespace detail {
          /** Value to pack for the argument trait */
          enum class ArgTrait : uint8_t {
-            none    = ULOG_TYPE_TRAIT_NONE,
-            u8      = ULOG_TYPE_TRAIT_U8,
-            s8      = ULOG_TYPE_TRAIT_S8,
-            b8      = ULOG_TYPE_TRAIT_BOOL,
-            u16     = ULOG_TYPE_TRAIT_U16,
-            s16     = ULOG_TYPE_TRAIT_S16,
-            ptr16   = ULOG_TYPE_TRAIT_PTR,
-            u32     = ULOG_TYPE_TRAIT_U32,
-            s32     = ULOG_TYPE_TRAIT_S32,
-            float32 = ULOG_TYPE_TRAIT_FLOAT,
-            str4    = ULOG_TYPE_TRAIT_STR4
+            none    = ULOG_TRAIT_ID_NONE,
+            u8      = ULOG_TRAIT_ID_U8,
+            s8      = ULOG_TRAIT_ID_S8,
+            b8      = ULOG_TRAIT_ID_BOOL,
+            u16     = ULOG_TRAIT_ID_U16,
+            s16     = ULOG_TRAIT_ID_S16,
+            ptr16   = ULOG_TRAIT_ID_PTR,
+            u32     = ULOG_TRAIT_ID_U32,
+            s32     = ULOG_TRAIT_ID_S32,
+            float32 = ULOG_TRAIT_ID_FLOAT,
+            str4    = ULOG_TRAIT_ID_STR4
          };
 
          template <typename T>
@@ -183,22 +183,7 @@ do {                                                                          \
       auto values = ::asx::ulog::detail::pack_bytes_to_tuple(args...);        \
       constexpr size_t _nbytes = std::tuple_size<decltype(values)>::value;    \
       static_assert(_nbytes <= 4, "ULOG supports up to 4 bytes of payload");  \
-      register uint8_t id asm("r24");                                         \
-      asm volatile(                                                           \
-         ".pushsection .logs,\"\",@progbits\n\t"                              \
-         ".balign 256\n\t"                                                    \
-         "1:\n\t"                                                             \
-         ".byte %1\n\t"                                                       \
-         ".long %2\n\t"                                                       \
-         ".long %3\n\t"                                                       \
-         ".asciz \"" __FILE__ "\"\n\t"                                        \
-         ".asciz \"" fmt "\"\n\t"                                             \
-         ".popsection\n\t"                                                    \
-         "ldi %0, hi8(1b)\n\t"                                                \
-         : "=r" (id)                                                          \
-         : "i" (_level), "i" (__LINE__), "i" (_typecode)                      \
-         :                                                                    \
-      );                                                                      \
+      _ULOG_GENERATE_LOG_ID(_level, fmt, _typecode);                          \
       if constexpr (_nbytes == 0) {                                           \
          ulog_detail_enqueue(id);                                             \
       } else if constexpr (_nbytes == 1) {                                    \
