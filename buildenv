@@ -1,7 +1,10 @@
 #!/bin/bash
+
+#
+# ASX build environment using Podman
+#
 readonly image=asx:latest
 readonly hostname_=asx
-
 
 # Running in a TTY?
 test -t 1 && USE_TTY="-it"
@@ -11,33 +14,48 @@ set -e
 
 # Variables
 this_dir=$(cd -P $(dirname $0) ; pwd)
+env_opt=""
+
+# Cleanup function for interrupted builds
+cleanup() {
+    if [[ -n "$container_name" ]]; then
+        podman rm -f "$container_name" 2>/dev/null || true
+    fi
+}
+
+# Make sure cleanup is called on exit
+trap cleanup EXIT INT TERM
 
 # Check podman is installed
 if ! which podman >& /dev/null; then
    echo "Could not find 'podman'. You must install podman first"
-   exit
+   exit 1
 fi
 
-# If the container image does not yet exists, build it
+# If the container image does not yet exist, build it
 if (($(podman images -q $image | wc -l) == 0)); then
-   podman build -t $image $this_dir || { echo "Failed to build the container image"; exit; }
+   echo "Building container image $image..."
+   podman build -t $image $this_dir || { echo "Failed to build the container image"; exit 1; }
 fi
 
+# Determine mount directory
 if [[ $(realpath $PWD) == $(realpath ${this_dir})* ]]; then
    mountdir=$(realpath ${this_dir})
 else
    mountdir=$(realpath ${this_dir}/..)
 fi
 
-base_opts="-u $(id -u $USER):$(getent group podman | cut -d: -f3) -v ${mountdir}:${mountdir}"
+# Run as the current user, mounting the source directory (and preserving permissions)
+base_opts="-u $(id -u):$(id -g) -v ${mountdir}:${mountdir}"
 workdir="$(realpath $(pwd))"
 
-[ -n "$SIM" ] && env_opt+="-e SIM=1"
+# Pass the SIM environment variable if set
+[ -n "$SIM" ] && env_opt="-e SIM=1"
 
-# Name the runtime container uniquely
-container_name="ASX_$(id -u)_$(date +%Y%m%d-%H%M%S)"
+# Name the runtime container uniquely with better timestamp
+container_name="ASX_$(id -u)_$(date +%s)"
 
-# Detect number of CPUs. Environment variable J can override the value. If no value given, then 1 is used
+# Detect number of CPUs
 if [[ -v J ]]; then
    ((core_count=J)); ((core_count)) || let core_count=1
 else
@@ -47,14 +65,20 @@ fi
 # Force a build of the container image
 if [[ "$1" == "build" ]]; then
    cd $this_dir
-   podman build -t $image . || { echo "Failed to build the container image"; exit; }
-   exit
+   podman build --no-cache -t $image . || { echo "Failed to build the container image"; exit 1; }
+   exit 0
 fi
+
+# Container options
+container_opts="--rm --init --name $container_name"
+container_opts+=" --security-opt label=disable"  # Helps with SELinux issues
+container_opts+=" --userns=keep-id"              # Better user namespace handling
 
 # Run make or start a shell
 if [[ $1 == "make" ]]; then
    shift
-   podman run ${USE_TTY} --rm --init --name $container_name $env_opt -h $hostname_ $base_opts -w $workdir $image make -j$core_count $@
+   echo "Running: make -j$core_count $@"
+   podman run ${USE_TTY} $container_opts $env_opt -h $hostname_ $base_opts -w $workdir $image make -j$core_count "$@"
 else
-   podman run ${USE_TTY} --rm --init --name $container_name $env_opt $xoptions -h $hostname_ $base_opts -w $workdir $image $@
+   podman run ${USE_TTY} $container_opts $env_opt $xoptions -h $hostname_ $base_opts -w $workdir $image "$@"
 fi
