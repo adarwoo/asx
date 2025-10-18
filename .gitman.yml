@@ -7,7 +7,6 @@ sources:
     repo: https://github.com/boost-ext/sml.git
     rev: master
     tag: v1.1.11
-  - name: trice
-    repo: https://github.com/rokath/trice.git
-    rev: master
-    tag: v1.0.0
+  - name: ulog
+    repo: https://github.com/adarwoo/ulog.git
+    rev: main

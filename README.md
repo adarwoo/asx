@@ -14,7 +14,7 @@ ASX comes standard with:
    <li>The boost sml library for incredible state machines</li>
    <li>The standard C++ library ported to the AVR</li>
    <li>Memory allocation support, and memory fencing</li>
-   <li>A memory trace library, with 0 cost logger for release builds</li>
+   <li>ULOG an almost 0 cost trace library (Flash, RAM and Time) - yet fully featured!</li>
    <li>A C++ modbus library, with ICD compiler written in Python</li>
    <li>A built-in build environment using Docker. Works on Linux and WSL2</li>
    <li>Makefile to build in docker, Windows native (including in AVR studio)</li>
@@ -60,6 +60,7 @@ Example code:
 #include <chrono>          // For the ""s
 #include <asx/ioport.hpp>  // Include before conf_board
 #include <asx/reactor.hpp> // Reactor API
+#include <asx/ulog.hpp>
 
 #include "conf_board.h"
 
@@ -69,19 +70,24 @@ using namespace std::chrono;
 
 // Initialise all and go
 auto main() -> int {
+   ULOG_MILE("Starting the test application!");
    Pin(MY_LED).init(ioport::dir_t::out, ioport::value_t::high);
 
-   reactor::bind([]{Pin(MY_LED).toggle();}).repeat(1s);
+   reactor::bind([]{ULOG_TRACE("Blink!"); Pin(MY_LED).toggle();}).repeat(1s);
    reactor::run();
 }
 ```
 
-The code is <2Kb when compiled in release mode, and the main block is 70bytes.
+The code is <2Kb when compiled in release mode, and the main block is 82bytes - including the log!
 
 Check the example directory which includes a make file
 
 <h1>How to build</h1>
+A docker/podman container image build file is provided for the build.
+The makefile creates the image and builds using it.
+So GNU Make is requires, as well as Docker or Podman.
 
+For the version control, gitman is used to handle dependencies.
 To try out the blink example, you need to have gitman installed.
 
 <h2>Building in Windows with WSL</h2>
@@ -93,7 +99,7 @@ pipx install gitman
 # Get ASX
 git clone https://github.com/adarwoo/asx
 gitman update
-# Make sure Docker-CE is running in Windows!
+# Make sure Docker-CE/podman is running in Windows!
 cd example
 make
 ```
