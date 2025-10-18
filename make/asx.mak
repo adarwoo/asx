@@ -9,7 +9,7 @@
 # i2c_slave  - C/C++ i2c slave support
 # i2c_master - C/C++ i2c master support
 
-VPATH+=$(ASX_DIR)
+VPATH+=$(ASX_DIR) $(ULOG_DIR)
 
 ASX_PATH:=$(if $(strip $(ASX_DIR)), $(addsuffix /,$(patsubst %/,%,$(filter-out $(TOP), $(ASX_DIR)))))
 
@@ -27,7 +27,7 @@ $(strip \
         $(if $(DEPOF_$(dep)), \
           $(foreach item,$(DEPOF_$(dep)), \
             $(if $(filter %.c %.cpp,$(item)), \
-              $(ASX_PATH)src/$(item), \
+              src/$(item), \
               $(call resolve_deps,$(item)) \
             ) \
           ), \
@@ -49,7 +49,7 @@ DEPOF_hw_timer    := hw_timer.cpp
 DEPOF_uart        := uart.cpp
 DEPOF_piezzo      := piezzo.c
 DEPOF_eeprom      := eeprom.cpp
-DEPOF_ulog        := ulog.c reactor uart
+DEPOF_ulog        := ulog.c ulog_asx.cpp reactor uart
 
 ASX_FILES 			:= $(sort $(call resolve_deps,$(ASX_USE)))
 
@@ -71,8 +71,11 @@ endif
 INCLUDE_DIRS+=\
 	$(ASX_DIR)/include \
 	$(ASX_DIR)/import/boost/include \
+  $(ASX_DIR)/import/ulog/include \
 
 ifndef SIM
 INCLUDE_DIRS+=\
 	$(ASX_DIR)/import/libstdc++/include
 endif
+
+# End of asx/make/asx.mak

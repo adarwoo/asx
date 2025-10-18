@@ -49,6 +49,7 @@ endif
 VPATH=$(TOP)
 
 ASX_DIR ?= $(TOP)/asx
+ULOG_DIR ?= $(TOP)/asx/import/ulog
 
 include $(ASX_DIR)/make/$(target).mak
 include $(ASX_DIR)/make/asx.mak
@@ -115,7 +116,7 @@ LD               = $(if $(findstring .cpp,$(suffix $(SRCS))),$(LINK.cxx),$(LINK.
 # Allow the source to be in sub-directories
 BUILDDIRS        = $(sort $(dir $(OBJS)))
 
-# Does the project have a trace config?
+# Does the project have a ulog config?
 CPPFLAGS += $(if $(wildcard $(TOP)/conf/conf_ulog.h), -DHAS_ULOG_CONFIG_FILE,)
 
 all : $(BUILDDIRS) $(BIN)$(BIN_EXT)
