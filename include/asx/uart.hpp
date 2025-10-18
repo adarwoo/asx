@@ -17,22 +17,27 @@
 #include <iostream>
 #endif
 
+// Type for the DRE callback
+typedef void(*uart_dre_callback)();
+
+// ----------------------------------------------------------------------------
+// Local reactor handles. To use, declare these extern in your C code.
+// ----------------------------------------------------------------------------
+
+extern "C" {
+   extern reactor_handle_t uart_on_usart0_rx_complete;
+   extern reactor_handle_t uart_on_usart0_tx_complete;
+   extern reactor_handle_t uart_on_usart1_rx_complete;
+   extern reactor_handle_t uart_on_usart1_tx_complete;
+
+   // These callbacks are managed by the Uart directly
+   extern uart_dre_callback uart_dre_callback_uart0;
+   extern uart_dre_callback uart_dre_callback_uart1;
+}
 
 namespace asx {
    namespace uart {
-      extern "C" {
-         reactor::Handle uart_on_usart0_tx_complete;
-         reactor::Handle uart_on_usart1_tx_complete;
-         reactor::Handle uart_on_usart0_rx_complete;
-         reactor::Handle uart_on_usart1_rx_complete;
-
-         using dre_callback = void(*)();
-
-         dre_callback uart_dre_callback_uart0;
-         dre_callback uart_dre_callback_uart1;
-      }
-
-      enum class width { _5=5, _6=6, _7=7, _8=8 }; // Note 9bits is not supported
+     enum class width { _5=5, _6=6, _7=7, _8=8 }; // Note 9bits is not supported
       enum class parity { none, odd, even };
       enum class stop { _1=1, _2=2 };
 

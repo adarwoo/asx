@@ -3,10 +3,18 @@
  * @brief Basic UART support for AVR devices.
  * @author software@arreckx.com
  * C implementation of the UART to allow using the UART from C and C++ code.
+ * A C code can declare reactor handles for RX and TX complete interrupts
+ *  as extern and use them to get notified of incoming data or transmission
+ *  completion.
+ * The Data Register Empty (DRE) interrupt is handled via a user-defined
+ *  callback function pointer that MUST be set up by the user of this module.
  */
+#include <stdint.h>
 #include <stddef.h>
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
+
 #include <reactor.h>
 
 // Type for the DRE callback
@@ -26,31 +34,30 @@ reactor_handle_t uart_on_usart1_rx_complete = REACTOR_NULL_HANDLE;
 reactor_handle_t uart_on_usart1_tx_complete = REACTOR_NULL_HANDLE;
 
 // These callbacks are managed by the Uart directly
-uart_dre_callback dre_callback_uart0 = NULL;
-uart_dre_callback dre_callback_uart1 = NULL;
+uart_dre_callback uart_dre_callback_uart0 = NULL;
+uart_dre_callback uart_dre_callback_uart1 = NULL;
 
 // ----------------------------------------------------------------------------
 // Reactor based ISR implementations
-// ----------------------------------------------------------------------------
 ISR(USART0_RXC_vect) {
-    char c = USART0.RXDATAL; // Shifts the data
-    reactor_notify(uart_on_usart0_rx_complete, (void*)c);
+    unsigned char c = USART0.RXDATAL; // Shifts the data
+    reactor_notify(uart_on_usart0_rx_complete, (void*)(uintptr_t)c);
 }
 
 ISR(USART1_RXC_vect) {
-    char c = USART1.RXDATAL; // Shifts the data
-    reactor_notify(uart_on_usart1_rx_complete, (void*)c);
+    unsigned char c = USART1.RXDATAL; // Shifts the data
+    reactor_notify(uart_on_usart1_rx_complete, (void*)(uintptr_t)c);
 }
 
 // The entire frame in the Transmit Shift register has been shifted out and there
 //  are no new data in the transmit buffer (TXCIE)
 ISR(USART0_TXC_vect) {
-    reactor_notify_from_isr(uart_on_usart0_tx_complete);
+    reactor_null_notify_from_isr(uart_on_usart0_tx_complete);
     USART0.STATUS |= USART_TXCIE_bm;
 }
 
 ISR(USART1_TXC_vect) {
-    reactor_notify_from_isr(uart_on_usart1_tx_complete);
+    reactor_null_notify_from_isr(uart_on_usart1_tx_complete);
     USART1.STATUS |= USART_TXCIE_bm;
 }
 
@@ -60,9 +67,9 @@ ISR(USART1_TXC_vect) {
 //  set up by the user of this UART module.
 // ----------------------------------------------------------------------------
 ISR(USART0_DRE_vect) {
-    dre_callback_uart0();
+    uart_dre_callback_uart0();
 }
 
 ISR(USART1_DRE_vect) {
-    dre_callback_uart1();
+    uart_dre_callback_uart1();
 }
