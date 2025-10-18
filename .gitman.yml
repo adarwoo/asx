@@ -9,4 +9,4 @@ sources:
     tag: v1.1.11
   - name: ulog
     repo: https://github.com/adarwoo/ulog.git
-    rev: master
+    rev: main
