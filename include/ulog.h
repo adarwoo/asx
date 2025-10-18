@@ -16,7 +16,6 @@
  * - Packed binary logs with 0/1/2/4-byte payloads
  * - Auto-tagged log level and type signature
  * - Inline assembly generates .logs metadata per callsite
- * - Double buffering. First buffer stores the logs, second the messages to send
  * - Messages are sent over a UART using COBS encoding
  *
  * Usage:
@@ -40,6 +39,8 @@
  * @note Only types up to 4 bytes total are supported per log. Format strings must be literals.
  * @note The `.logs` section can be parsed from the ELF to map runtime packets back to messages.
  * @note You are limited to 255 messages per application
+ * @note This header is C-compatible. C++ users should prefer the type-safe templated version in ulog.hpp
+ * @note This header requires C11 or later for _Generic support.
  *
  * @author software@arreckx.com
  */
@@ -129,10 +130,12 @@ void ulog_detail_enqueue_4(uint8_t id, uint8_t v0, uint8_t v1, uint8_t v2, uint8
 #ifndef __cplusplus
 
 // ============================================================================
-// Static inline runtime dispatch functions (FIXED)
+// Static inline runtime dispatch functions
 // ============================================================================
 
-// Updated: Remove fmt parameter, generate ID in the calling macro
+// ----------------------------------------------------------------------------
+// inline helpers to enqueue all possible combinations based on the number and types
+// ----------------------------------------------------------------------------
 static inline void _ulog_dispatch_0(uint8_t id) {
     ulog_detail_enqueue(id);
 }
@@ -197,11 +200,8 @@ static inline void _ulog_dispatch_4_u8_u8_u8_u8(uint8_t id, uint8_t a, uint8_t b
 }
 
 // ============================================================================
-// Updated dispatch macros - generate ID first, then call function
-// ============================================================================
-
-// ============================================================================
-// Type code extraction helper
+// Compile time type code extraction helper
+// Given a type x, return the corresponding ULOG_TRAIT_ID_XXX value
 // ============================================================================
 #define _ULOG_TC(x) _Generic((x), \
    uint8_t:  ULOG_TRAIT_ID_U8, \
@@ -223,7 +223,11 @@ static inline void _ulog_dispatch_4_u8_u8_u8_u8(uint8_t id, uint8_t a, uint8_t b
    } while(0)
 
 // ============================================================================
-// Simplified dispatch macros with computed typecode
+// Simplified dispatch macros based only on argument count
+// The expansion yields a compile-time evaluated typecode and calls the appropriate
+// dispatcher function.
+// This relies on compiler support for C11 _Generic. The final resolution happens
+// at compile time, so there is no runtime overhead.
 // ============================================================================
 
 #define _ULOG_DISPATCH_0(level, fmt) \
@@ -311,19 +315,17 @@ static inline void _ulog_dispatch_4_u8_u8_u8_u8(uint8_t id, uint8_t a, uint8_t b
       _ulog_dispatch_4_u8_u8_u8_u8(id, a, b, c, d); \
    } while(0)
 
-// Argument counting (unchanged)
+// Support macros to expand ... into actual dispatcher based on argument count
 #define _ULOG_GET_ARG_COUNT(...) _ULOG_GET_ARG_COUNT_IMPL(0, ##__VA_ARGS__, 4, 3, 2, 1, 0)
 #define _ULOG_GET_ARG_COUNT_IMPL(dummy, _1, _2, _3, _4, N, ...) N
-
-// Fixed dispatcher with proper indirection (unchanged)
 #define _ULOG_DISPATCH(n) _ULOG_DISPATCH_IMPL(n)
 #define _ULOG_DISPATCH_IMPL(n) _ULOG_DISPATCH_##n
 
-// Main ULOG macro (unchanged)
+// Main ULOG macro (C version)
 #define ULOG(level, fmt, ...) \
     _ULOG_DISPATCH(_ULOG_GET_ARG_COUNT(__VA_ARGS__))(level, fmt, ##__VA_ARGS__)
 
-#endif // __cplusplus
+#endif // End of the C-only section
 
 // Include the project trace config (unless passed on the command line)
 #if defined HAS_ULOG_CONFIG_FILE && !defined ULOG_LEVEL
