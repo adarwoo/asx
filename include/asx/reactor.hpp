@@ -40,6 +40,7 @@
 
 #include <reactor.h>
 
+#include <asx/chrono.hpp>
 #include <asx/timer.hpp>
 
 namespace asx {
@@ -131,7 +132,7 @@ namespace asx {
       ///< Wrap into a class
       class Handle {
          reactor_handle_t handle;
-         using clock = timer::steady_clock;
+         using clock = asx::chrono::steady_clock;
       public:
          // Constructor to initialize handle
          explicit constexpr Handle(reactor_handle_t h) noexcept: handle(h) {}
@@ -213,13 +214,16 @@ namespace asx {
          }
 
          /**
-          * @brief Invoke the reactor handler after a delay from now
-          * @param after The time to wait before invoking the handler
-          * @return The underlying running timer instance. This is required to cancel the timer.
-          * @details A timer is armed with the given time and will invoke the handler
-          * after the given time.
+          * @brief Invoke the reactor handler once after the given time.
+          * @param after Duration to wait before the handler is invoked.
           * @note Do not use this function inside an interrupt context.
           */
+         template<typename Rep, typename Period>
+         inline timer::Instance delay(const std::chrono::duration<Rep, Period>& after) {
+            auto converted = std::chrono::duration_cast<clock::duration>(after);
+            return timer_arm(handle, clock::to_timer_count(clock::now() + converted), 0, nullptr);
+         }
+
          inline timer::Instance delay(timer::duration after) {
             return timer_arm(handle, clock::to_timer_count(clock::now() + after), 0, nullptr);
          }
@@ -233,6 +237,22 @@ namespace asx {
           * @note Do not use this function inside an interrupt context.
           * @see delay()
           */
+         template<typename Rep1, typename Period1, typename Rep2, typename Period2>
+         inline timer::Instance repeat(
+            const std::chrono::duration<Rep1, Period1>& after,
+            const std::chrono::duration<Rep2, Period2>& repeat) {
+
+            auto after_converted = std::chrono::duration_cast<clock::duration>(after);
+            auto repeat_converted = std::chrono::duration_cast<clock::duration>(repeat);
+            
+            return timer_arm(
+               handle,
+               clock::to_timer_count(clock::now() + after_converted),
+               clock::to_timer_count(repeat_converted),
+               nullptr
+            );
+         }
+
          inline timer::Instance repeat(timer::duration after, timer::duration repeat) {
             return timer_arm(
                handle,

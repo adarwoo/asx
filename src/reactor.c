@@ -35,7 +35,7 @@
 #include "alert.h"
 #include "debug.h"
 #include "reactor.h"
-
+#include "ulog.h"
 
 /**
  * @def REACTOR_MAX_HANDLERS
@@ -55,8 +55,7 @@ bool _reactor_stop_on_next = false;
 #endif
 
 /** Holds all reactor handlers with mapping to the reaction mask */
-typedef struct
-{
+typedef struct {
    reactor_handler_t handler;
    void *arg;
 } reactor_item_t;
@@ -105,34 +104,57 @@ static void
  * @param handler  Function to call when an event is ready for processing
  * @param priority Priority of the handler during scheduling. High priority handlers are handled first
  */
-reactor_handle_t reactor_register(const reactor_handler_t handler, reactor_priority_t priority)
-{
+reactor_handle_t reactor_register(const reactor_handler_t handler, reactor_priority_t priority) {
    alert_and_stop_if(_reactor_lock != false);
+   reactor_handle_t retval = REACTOR_NULL_HANDLE;
 
    // Initialize variables depending on priority
-   uint8_t start = (priority == reactor_prio_low) ? REACTOR_MAX_HANDLERS - 1 : 0;
-   uint8_t end = (priority == reactor_prio_low) ? 0 : REACTOR_MAX_HANDLERS;
-   int8_t step = (priority == reactor_prio_low) ? -1 : 1;
+   uint8_t start = 0;
+   uint8_t end = REACTOR_MAX_HANDLERS;
+   int8_t step = 1;
+   uint8_t count_free_slots = 0;
 
-   for (uint8_t i=start; i!=end; i += step)
-   {
-      if (_handlers[i].handler == NULL)
-      {
-         _handlers[i].handler = handler;
-         return i;
+   if ( priority == reactor_prio_low ) {
+      start = end - 1;
+      end = 0;
+      step = -1;
+   }
+
+   // Look for a free slot - but count all the way to the end
+   for (uint8_t i=start; i!=end; i += step) {
+      if (_handlers[i].handler == NULL) {
+         if (retval == REACTOR_NULL_HANDLE) {
+            // Found a free slot
+            _handlers[i].handler = handler;
+            retval = i;
+         } else {
+            // Count free slots
+            count_free_slots++;
+         }
       }
    }
 
    // Make sure a valid slot was found
-   alert_and_stop();
+   alert_and_stop_if(retval == REACTOR_NULL_HANDLE);
 
-   return 0;
+   // Log registration
+   if (priority == reactor_prio_low) {
+      ULOG_INFO("New reactor handler registered [blue]LOW[/blue]: handle={}, free_slots={}",
+         retval,
+         count_free_slots
+      );
+   } else {
+      ULOG_INFO("New reactor handler registered [red]HIGH[/red]: handle={}, free_slots={}",
+         retval,
+         count_free_slots
+      );
+   }
+
+   return retval;
 }
 
-void reactor_null_notify_from_isr(reactor_handle_t handle)
-{
-   if ( handle != REACTOR_NULL_HANDLE )
-   {
+void reactor_null_notify_from_isr(reactor_handle_t handle) {
+   if ( handle != REACTOR_NULL_HANDLE ) {
       uint8_t bit_shift = bit_shift_table[handle % 8];
       uint8_t *pNotif = (uint8_t*)&_reactor_notifications;
       uint8_t byte_index = handle / 8;
@@ -179,10 +201,8 @@ reactor_handle_t reactor_mask_pop(reactor_mask_t *mask) {
  * Interrupts are disabled for atomic operations
  * This function can be called from within interrupts
  */
-void reactor_notify( reactor_handle_t handle, void *data )
-{
-   if ( handle != REACTOR_NULL_HANDLE )
-   {
+void reactor_notify( reactor_handle_t handle, void *data ) {
+   if ( handle != REACTOR_NULL_HANDLE ) {
       irqflags_t flags = cpu_irq_save();
 
       _handlers[handle].arg = data;
@@ -197,10 +217,8 @@ void reactor_notify( reactor_handle_t handle, void *data )
  * Never call from an interrupt
  * This function is meant to be used with masks
  */
-void reactor_invoke( reactor_handle_t handle, void *data )
-{
-   if ( handle != REACTOR_NULL_HANDLE )
-   {
+void reactor_invoke( reactor_handle_t handle, void *data ) {
+   if ( handle != REACTOR_NULL_HANDLE ) {
       _handlers[handle].handler(data);
    }
 }
@@ -211,8 +229,7 @@ void reactor_invoke( reactor_handle_t handle, void *data )
  * @param handle Handle to clear.
  * @param ... More handles are accepted
  */
-void reactor_clear(reactor_mask_t mask)
-{
+void reactor_clear(reactor_mask_t mask) {
    // Make atomic to prevent race (notification can be set from ISR)
    cli();
     _reactor_notifications &= ~(mask);
@@ -228,22 +245,19 @@ void reactor_yield(void *data) {
 }
 
 /** Process the reactor loop */
-void reactor_run(void)
-{
+void reactor_run(void) {
    // Set the watchdog which is reset by the reactor
    // If the timer is uses, the watchdog would be refreshed every 1ms, but otherwise, we don't know
    // There is no need for too aggressive timings
-   wdt_enable(WDTO_1S);
+   wdt_enable(WDTO_2S);
 
    // Atomically read and clear the notification flags allowing more
    //  interrupt from setting the flags which will be processed next time round
-   while (true)
-   {
+   while (true) {
       debug_clear(REACTOR_BUSY);
       cli();
-   
-      if ( _reactor_notifications == 0 )
-      {
+
+      if ( _reactor_notifications == 0 ) {
          // Allow measure the amount of 'free' time
          debug_set(REACTOR_IDLE);
 
@@ -251,9 +265,7 @@ void reactor_run(void)
          sei();
          sleep_cpu();
          debug_clear(REACTOR_IDLE);
-      }
-      else
-      {
+      } else {
          uint8_t index;
 
          // This approach sacrifices text size over speed

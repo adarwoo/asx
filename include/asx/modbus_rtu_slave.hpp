@@ -133,6 +133,11 @@ namespace asx {
             sm.process_event(can_start{});
          }
 
+         static void reconfigure_uart() {
+            Uart::get().CTRLC = Uart::get_ctrl_c();
+            Uart::get().BAUD = Uart::get_baud_reg();
+         }
+
          static void on_rx_char(uint8_t c) {
             sm.process_event(char_received{c});
          }
