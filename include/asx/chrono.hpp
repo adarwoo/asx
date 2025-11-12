@@ -73,6 +73,10 @@ namespace asx {
          }
       };
 
+      // Define a time point representing zero time
+      constexpr auto time_zero =
+         chrono::steady_clock::time_point(chrono::steady_clock::duration::zero());
+      
       // Overload the lt operator to account for the roll over
       inline bool operator<(steady_clock::time_point lhs, steady_clock::time_point rhs) {
          using rep = steady_clock::rep;
