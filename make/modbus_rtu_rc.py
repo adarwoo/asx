@@ -120,7 +120,7 @@ namespace @NAMESPACE@ {
         }
 
         static void process_char(const uint8_t c) noexcept {
-            ULOG_DEBUG("Received char: 0x{:2X} at position {}", c, cnt);
+            ULOG_DEBUG0("Received char: 0x{:2X} at position {}", c, cnt);
 
             if (state == state_t::IGNORE) {
                 return;
