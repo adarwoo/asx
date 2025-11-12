@@ -47,7 +47,7 @@ TEMPLATE_CODE_MASTER="""#pragma once
  */
 #include <cstdint>
 
-#include <asx/ulog.hpp>
+#include <ulog.h>
 #include <asx/modbus_rtu_master.hpp>
 
 namespace @NAMESPACE@ {
@@ -225,7 +225,7 @@ TEMPLATE_CODE_SLAVE="""#pragma once
  * the modbus_rtu_slave.cpp file only which will create a full rtu slave device.
  */
 #include <cstdint>
-#include <asx/ulog.hpp>
+#include <ulog.h>
 #include <asx/modbus_rtu_slave.hpp>
 
 namespace @NAMESPACE@ {

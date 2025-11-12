@@ -52,11 +52,6 @@ extern "C" void alert_record( bool doAbort)
 
    alert_user_function();
 
-   // Output to stdout?
-   #ifdef ALERT_TO_STDOUT
-   printf_P("ALERT\n");
-   #endif
-
    // Stop or not
    if ( doAbort )
    {

@@ -25,11 +25,6 @@
 #include <stdbool.h>
 #include <ulog.h>
 
-#ifdef __cplusplus
-#include <asx/ulog.hpp>
-extern "C"
-{
-#endif
 
 /************************************************************************/
 /* Public API                                                           */
@@ -39,15 +34,31 @@ extern "C"
  * Prototype to the user alert function. A weak default implementation
  * is provided, which turn on the alert LED.
  * This can be overriden by the application.
- * This function should be used in all critical tests
+ * This function can be called directly if needed.
  */
-void alert_user_function(void);
+#ifdef __cplusplus
+   extern "C" void alert_user_function(void);
+#else
+   extern void alert_user_function(void);
+#endif
 
-/** Ready the alert stack */
-// Now done in init5 void alert_init(void);
 
-/** Each application must customize this function */
-void alert_record(bool abort);
+/**
+ * void alert_init(void)
+ * Ready the alert stack
+ * This is done in init5
+ */
+
+/**
+ * Record an alert event.
+ *
+ * @param abort If true, the system is halted after recording the alert.
+ */
+#ifdef __cplusplus
+   extern "C" void alert_record(bool abort);
+#else
+   extern void alert_record(bool abort);
+#endif
 
 /** Raise and alert. This macro adds the line and file automatically */
 #define alert() do { ULOG_ERROR("ALERT!"); alert_record(false) } while(0)
@@ -67,9 +78,6 @@ void alert_record(bool abort);
       alert_record(true);                     \
    }
 
-#ifdef __cplusplus
-}
-#endif
 
 /**@}*/
 /**@}*/
