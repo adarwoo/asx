@@ -138,17 +138,9 @@ reactor_handle_t reactor_register(const reactor_handler_t handler, reactor_prior
    alert_and_stop_if(retval == REACTOR_NULL_HANDLE);
 
    // Log registration
-   if (priority == reactor_prio_low) {
-      ULOG_INFO("New reactor handler registered [blue]LOW[/blue]: handle={}, free_slots={}",
-         retval,
-         count_free_slots
-      );
-   } else {
-      ULOG_INFO("New reactor handler registered [red]HIGH[/red]: handle={}, free_slots={}",
-         retval,
-         count_free_slots
-      );
-   }
+   ULOG_INFO("New reactor handler registered Prio={} Handle={} Free_slots={}",
+      priority, retval, count_free_slots
+   );
 
    return retval;
 }

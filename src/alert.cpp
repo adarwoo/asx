@@ -48,29 +48,28 @@ extern "C" __attribute__((weak)) void alert_user_function(void) {
  */
 extern "C" void alert_record( bool doAbort)
 {
-   cli();
-
    alert_user_function();
 
    // Stop or not
-   if ( doAbort )
-   {
+   if ( doAbort ) {
       #ifdef DEBUG
          // Stop the watchdog for debug only so the program will hang rather
          //  than reset
          wdt_disable();
+      #else
+         // Kick the watchdog to give time to flush the logs
+         wdt_reset();
       #endif
+
+      // Flush ULOG buffers - this is blocking which is OK at this stage
+      ulog_flush();
 
       // Lock forever. Breaking the execution will end up here
       //  (or an interrupt), and the trace will point to the
       //  culprit.
       // The watchdog will then reset.
-      for (;;)
-      {
-      }
+      for (;;) {}
    }
-
-   sei();
 }
 
  /**@}*/

@@ -69,13 +69,13 @@ SRCS+=\
 endif
 
 INCLUDE_DIRS+=\
-	$(ASX_DIR)/include \
-	$(ASX_DIR)/import/boost/include \
+  $(ASX_DIR)/include \
+  $(ASX_DIR)/import/boost/include \
   $(ASX_DIR)/import/ulog/include \
 
 ifndef SIM
 INCLUDE_DIRS+=\
-	$(ASX_DIR)/import/libstdc++/include
+  $(ASX_DIR)/import/libstdc++/include
 endif
 
 # End of asx/make/asx.mak
