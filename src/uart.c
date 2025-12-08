@@ -11,6 +11,7 @@
  */
 #include <stdint.h>
 #include <stddef.h>
+#include <ulog.h>
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -46,6 +47,7 @@ ISR(USART0_RXC_vect) {
 
 ISR(USART1_RXC_vect) {
     unsigned char c = USART1.RXDATAL; // Shifts the data
+    ULOG_DEBUG0("UART1 RXC Interrupt: 0x{:2x}", c);
     reactor_notify(uart_on_usart1_rx_complete, (void*)(uintptr_t)c);
 }
 
