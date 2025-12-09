@@ -14,6 +14,12 @@ set -e
 
 # Variables
 this_dir=$(cd -P $(dirname $0) ; pwd)
+
+# Allow mounting from a different directory
+if [[ $(realpath $PWD) != $(realpath ${this_dir})* ]]; then
+   this_dir=$(realpath ${this_dir}/..)
+fi
+
 env_opt=""
 
 # Cleanup function for interrupted builds
