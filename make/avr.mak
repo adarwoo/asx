@@ -48,6 +48,7 @@ define PRE_LINK
 			print; \
 			print "  .logs () :"; \
 			print "  {"; \
+			print "    __ulog_logs_start = .;"; \
 			print "    KEEP(*(.logs))"; \
 			print "  } > logmeta"; \
 			print ""; \

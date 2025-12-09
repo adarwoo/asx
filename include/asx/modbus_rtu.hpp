@@ -33,7 +33,6 @@
 #include <asx/reactor.hpp>
 #include <asx/hw_timer.hpp>
 
-
 namespace asx {
    namespace modbus {
       enum class command_t : uint8_t {
