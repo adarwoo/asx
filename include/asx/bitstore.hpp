@@ -22,6 +22,9 @@
 // SOFTWARE.
 
 #include <type_traits>
+#include <cstddef>
+#include <cstdint>
+#include <cstdbool>
 
 namespace asx
 {

@@ -22,6 +22,7 @@
 // SOFTWARE.
 
 #include <asx/bitstore.hpp>
+#include <array>
 
 namespace asx {
     template<size_t N, size_t THR>
