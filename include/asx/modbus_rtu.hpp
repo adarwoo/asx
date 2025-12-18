@@ -87,19 +87,19 @@ namespace asx {
       };
 
       struct can_start {
-         constexpr const char* c_str() const  { return "cs "; }
+         constexpr const char* c_str() const  { return "can_start"; }
       };
       struct t15_timeout {
-         constexpr const char* c_str() const { return "T15 "; }
+         constexpr const char* c_str() const { return "T15"; }
       };
       struct t35_timeout {
-         constexpr const char* c_str() const { return "T35 "; }
+         constexpr const char* c_str() const { return "T35"; }
       };
       struct t40_timeout {
-         constexpr const char* c_str() const { return "T40 "; }
+         constexpr const char* c_str() const { return "T40"; }
       };
       struct reply_timeout {
-         constexpr const char* c_str() const { return "rto"; }
+         constexpr const char* c_str() const { return "reply_timeout"; }
       };
       struct rts  {
          constexpr const char* c_str() const { return "rts"; }
@@ -108,17 +108,17 @@ namespace asx {
          uint8_t c{};
 
          const char* c_str() const { 
-            static char desc[] = "R:..";
-            desc[2] = static_cast<char>('0' + ((c >> 4) & 0x0F));
-            desc[3] = static_cast<char>('0' + (c & 0x0F));
+            static char desc[] = "char rx: 0x..";
+            desc[9] = static_cast<char>('0' + ((c >> 4) & 0x0F));
+            desc[10] = static_cast<char>('0' + (c & 0x0F));
             return desc;
          }
       };
       struct frame_sent  {
-         constexpr const char* c_str() const { return "FS "; }
+         constexpr const char* c_str() const { return "frame_sent"; }
       };
       struct check_pendings {
-         constexpr const char* c_str() const { return "CP "; }
+         constexpr const char* c_str() const { return "check_pendings"; }
       };
 
 
