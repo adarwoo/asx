@@ -24,11 +24,11 @@ BIN_EXT :=.elf
 # Remove all logs
 ARCHFLAGS :=-mmcu=$(ARCH) -B $(SPEC_PATH) -isystem $(PACK_PATH)/include
 CONLYFLAGS := -std=gnu17
-CFLAGS += --save-temps -funsigned-char -funsigned-bitfields -ffunction-sections -fdata-sections -fshort-enums $(ARCHFLAGS)
+CFLAGS += --save-temps -funsigned-char -funsigned-bitfields -ffunction-sections -fdata-sections -fshort-enums
 CFLAGS += -O$(if $(NDEBUG),s,g)
-ASFLAGS += $(CPPFLAGS) $(ARCHFLAGS)
+ASFLAGS += $(CPPFLAGS)
 CXXFLAGS += -fno-threadsafe-statics -Wno-subobject-linkage
-LDFLAGS += $(ARCHFLAGS) -Wl,--demangle -Wl,-flto -Wl,-Map="$(BUILD_DIR)/$(BIN).map" -Wl,--start-group -Wl,-lm  -Wl,--end-group -Wl,--gc-sections -mmcu=$(ARCH)
+LDFLAGS += -Wl,--demangle -Wl,-flto -Wl,-Map="$(BUILD_DIR)/$(BIN).map" -Wl,--start-group -Wl,-lm  -Wl,--end-group -Wl,--gc-sections -mmcu=$(ARCH)
 LDFLAGS += -Wl,--script=$(BUILD_DIR)/avrx3_with_ulog_sections.ld
 
 define DIAG

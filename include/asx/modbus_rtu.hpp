@@ -87,37 +87,38 @@ namespace asx {
       };
 
       struct can_start {
-         constexpr const char *c_str() const  { return "can_start"; }
+         constexpr const char* c_str() const  { return "can_start"; }
       };
       struct t15_timeout {
-         constexpr const char *c_str() const { return "t15"; }
+         constexpr const char* c_str() const { return "T15"; }
       };
       struct t35_timeout {
-         constexpr const char *c_str() const { return "t35"; }
+         constexpr const char* c_str() const { return "T35"; }
       };
       struct t40_timeout {
-         constexpr const char *c_str() const { return "t40"; }
+         constexpr const char* c_str() const { return "T40"; }
       };
       struct reply_timeout {
-         constexpr const char *c_str() const { return "reply_timeout"; }
+         constexpr const char* c_str() const { return "reply_timeout"; }
       };
       struct rts  {
-         constexpr const char *c_str() const { return "rts"; }
+         constexpr const char* c_str() const { return "rts"; }
       };
       struct char_received {
          uint8_t c{};
 
-         const char *c_str() const {
-            static char desc[] = "char_rxd=0x..";
-            utoa(c, desc+11, 16);
+         const char* c_str() const { 
+            static char desc[] = "char rx: 0x..";
+            desc[9] = static_cast<char>('0' + ((c >> 4) & 0x0F));
+            desc[10] = static_cast<char>('0' + (c & 0x0F));
             return desc;
          }
       };
       struct frame_sent  {
-         constexpr const char *c_str() const { return "frame_sent"; }
+         constexpr const char* c_str() const { return "frame_sent"; }
       };
       struct check_pendings {
-         constexpr const char *c_str() const { return "check_pendings"; }
+         constexpr const char* c_str() const { return "check_pendings"; }
       };
 
 
@@ -152,12 +153,12 @@ namespace asx {
       struct Logging {
          template <class SM, class TEvent>
          void log_process_event(const TEvent& evt) {
-            ULOG_INFO("[event]", evt.c_str());
+            ULOG_INFO("[event]", evt.c_str()[0]);
          }
 
          template <class SM, class TGuard, class TEvent>
          void log_guard(const TGuard&, const TEvent&, bool result) {
-            ULOG_INFO("[guard] - yeilds:", result);
+            //ULOG_INFO("[guard] - yeilds:", result);
          }
 
          template <class SM, class TAction, class TEvent>
@@ -167,7 +168,7 @@ namespace asx {
 
          template <class SM, class TSrcState, class TDstState>
          void log_state_change(const TSrcState& src, const TDstState& dst) {
-            ULOG_INFO("[state transition to] :", dst.c_str());
+            //ULOG_INFO("[state transition to] :", dst.c_str());
          }
       };
    } // namespace modbus

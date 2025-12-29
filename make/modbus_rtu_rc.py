@@ -922,11 +922,17 @@ class CodeGenerator:
         self.conformity_level = 0
 
         if self.mode == "slave" and PRODUCT_CODE in self.identification:
-            if "device" not in tree:
-                raise ParsingException("identification requires a simple 'device' node")
+            # Find a node in tree whose key starts with device@
+            device_key = next((key for key in tree.keys() if key.startswith("device@")), None)
+            if device_key:
+               device = tree[device_key]
+            else:
+                if "device" not in tree:
+                    raise ParsingException("identification requires a 'device' node")
+                device = tree["device"]
 
             # Insert the report slave ID function
-            tree["device"].append(
+            device.append(
                 (
                     u8(0x11, alias="REPORT_SLAVE_ID"),
                     "on_report_slave_id"
@@ -942,7 +948,7 @@ class CodeGenerator:
                 self.conformity_level = max(self.conformity_level, MEI_OBJECT_CATEGORY[keys])
 
             # Insert the report slave ID function
-            tree["device"].append(
+            device.append(
                 (
                     u8(0x2B, alias="ENCAPSULATED_INTERFACE_TRANSPORT"),
                     u8(0x0E, alias="READ_DEVICE_IDENTIFICATION"),
@@ -959,7 +965,7 @@ class CodeGenerator:
             ]
 
             # Insert the diagnostic function
-            tree["device"].append(
+            device.append(
                 (
                     u8(0x08, alias="DIAGNOSTICS"),
                     u16(alias="SUBFUNCTION"),
@@ -1023,7 +1029,7 @@ class CodeGenerator:
         if self.device_address is None:
             return f"""///< Runtime ID. Set-up before starting the modbus\n{tab}inline static uint8_t device_address = 255;"""
 
-        return f"""///< Device ID\n{tab}static constexpr auto device_address = uint8_t{self.device_address}"""
+        return f"""///< Device ID\n{tab}static constexpr auto device_address = uint8_t{{{self.device_address}}};"""
 
     def set_device_address(self, indent):
         if self.device_address is None:
