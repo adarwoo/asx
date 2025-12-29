@@ -116,9 +116,6 @@ LD               = $(if $(findstring .cpp,$(suffix $(SRCS))),$(LINK.cxx),$(LINK.
 # Allow the source to be in sub-directories
 BUILDDIRS        = $(sort $(dir $(OBJS)))
 
-# Does the project have a ulog config?
-CPPFLAGS += $(if $(wildcard $(TOP)/conf/conf_ulog.h), -DHAS_ULOG_CONFIG_FILE,)
-
 all : $(BUILDDIRS) $(BIN)$(BIN_EXT)
 
 -include $(RCDEP_FILES)
