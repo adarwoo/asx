@@ -54,7 +54,7 @@ DEPOF_hw_timer    := hw_timer.cpp
 DEPOF_uart        := uart.cpp
 DEPOF_piezzo      := piezzo.c
 DEPOF_eeprom      := eeprom.cpp
-DEPOF_ulog        := ulog.c ulog_avr_asx_gnu.cpp reactor uart
+DEPOF_ulog        := ulog.c ulog_asx.cpp reactor uart
 
 ASX_FILES 			:= $(sort $(call resolve_deps,$(ASX_USE)))
 
